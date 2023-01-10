@@ -7,33 +7,17 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mail-debug/types"
 	"mime"
 	"mime/multipart"
 	"mime/quotedprintable"
 	"net/mail"
 	"strings"
-	"time"
 
 	"github.com/emersion/go-smtp"
 )
 
-type dataCallback func(*SessionData) error
-
-type partData struct {
-	mediaType string
-	data      []byte
-	charset   string
-}
-
-type SessionData struct {
-	MessageId     string
-	From          string
-	FromFormatted string
-	To            []string
-	Subject       string
-	Date          time.Time
-	parts         []partData
-}
+type dataCallback func(*types.MailData) error
 
 // The Backend implements SMTP server methods.
 type Backend struct {
@@ -55,7 +39,7 @@ func (b *Backend) NewSession(_ *smtp.Conn) (smtp.Session, error) {
 		username: b.username,
 		password: b.password,
 		onData:   b.onData,
-		data:     &SessionData{},
+		data:     &types.MailData{},
 	}, nil
 }
 
@@ -64,7 +48,7 @@ type session struct {
 	username string
 	password string
 	onData   dataCallback
-	data     *SessionData
+	data     *types.MailData
 }
 
 func (s *session) AuthPlain(username, password string) error {
@@ -100,15 +84,11 @@ func (s *session) Data(r io.Reader) error {
 
 		if strings.HasPrefix(mediaType, "multipart/") {
 			partData, _ := parsePart(m.Body, params)
-			s.data.parts = partData
+			s.data.Parts = partData
 		} else {
 			data, _ := io.ReadAll(m.Body)
-			s.data.parts = []partData{
-				{
-					data:      data,
-					mediaType: mediaType,
-					charset:   params["charset"],
-				},
+			s.data.Parts = []types.PartData{
+				newPartData(data, mediaType, params["charset"]),
 			}
 		}
 
@@ -136,6 +116,7 @@ func (s *session) Data(r io.Reader) error {
 
 	//date := carbon.Parse(m.Header.Get("Date"))
 
+	s.data.MessageId = m.Header.Get("Message-Id")
 	s.data.Date = date
 	s.data.FromFormatted = from
 	s.data.Subject = subject
@@ -151,7 +132,15 @@ func (s *session) Logout() error {
 	return nil
 }
 
-func parsePart(mimeData io.Reader, params map[string]string) ([]partData, error) {
+func newPartData(data []byte, mediaType string, charset string) types.PartData {
+	return types.PartData{
+		Data:      string(data),
+		MediaType: mediaType,
+		Charset:   charset,
+	}
+}
+
+func parsePart(mimeData io.Reader, params map[string]string) ([]types.PartData, error) {
 	boundary := params["boundary"]
 	// Instantiate a new io.Reader dedicated to MIME multipart parsing
 	// using multipart.NewReader()
@@ -160,7 +149,7 @@ func parsePart(mimeData io.Reader, params map[string]string) ([]partData, error)
 		return nil, nil
 	}
 
-	parts := []partData{}
+	parts := []types.PartData{}
 
 	// Go through each of the MIME part of the message Body with NextPart(),
 	for {
@@ -187,11 +176,7 @@ func parsePart(mimeData io.Reader, params map[string]string) ([]partData, error)
 			// We can do something here with the data of this single MIME part.
 			data, err := extractPartData(newPart)
 			if err == nil && data != nil {
-				parts = append(parts, partData{
-					data:      data,
-					mediaType: mediaType,
-					charset:   params["charset"],
-				})
+				parts = append(parts, newPartData(data, mediaType, params["charset"]))
 			}
 		}
 

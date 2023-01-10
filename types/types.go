@@ -1,5 +1,7 @@
 package types
 
+import "time"
+
 type Config struct {
 	SMTPPort string `default:"1025"`
 	Username string `default:"username"`
@@ -15,4 +17,20 @@ type Config struct {
 	MaxMessageBytes   int  `default:"1048576"`
 	MaxRecipients     int  `default:"50"`
 	AllowInsecureAuth bool `default:"true"`
+}
+
+type PartData struct {
+	MediaType string
+	Data      string
+	Charset   string
+}
+
+type MailData struct {
+	MessageId     string     `json:"messageId"`
+	From          string     `json:"from"`
+	FromFormatted string     `json:"fromFormatted"`
+	To            []string   `json:"to"`
+	Subject       string     `json:"subject"`
+	Date          time.Time  `json:"date"`
+	Parts         []PartData `json:"parts"`
 }

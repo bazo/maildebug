@@ -4,6 +4,7 @@ import (
 	"flag"
 	"log"
 	"mail-debug/session"
+	"mail-debug/storage"
 	"mail-debug/types"
 	"time"
 
@@ -21,8 +22,19 @@ func loadConfig() {
 func main() {
 	loadConfig()
 
-	s := smtp.NewServer(session.NewBackend(config.Username, config.Password, func(data *session.SessionData) error {
-		log.Println(data)
+	storage := storage.NewStorage()
+
+	log.Println(storage)
+
+	defer storage.Close()
+	err := storage.Init(config.DbName)
+
+	if err != nil {
+		log.Fatal("Opening db: ", err)
+	}
+
+	s := smtp.NewServer(session.NewBackend(config.Username, config.Password, func(data *types.MailData) error {
+		storage.SaveMessage(data)
 		return nil
 	}))
 
