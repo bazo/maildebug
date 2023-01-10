@@ -116,7 +116,14 @@ func (s *session) Data(r io.Reader) error {
 
 	//date := carbon.Parse(m.Header.Get("Date"))
 
-	s.data.MessageId = m.Header.Get("Message-Id")
+	messageId := m.Header.Get("Message-Id")
+
+	parts := strings.Split(messageId, "@")
+
+	id := parts[0][1 : len(parts[0])-1]
+
+	s.data.Id = id
+	s.data.MessageId = messageId
 	s.data.Date = date
 	s.data.FromFormatted = from
 	s.data.Subject = subject

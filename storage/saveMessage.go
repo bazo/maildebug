@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"mail-debug/types"
-	"strings"
 
 	bolt "go.etcd.io/bbolt"
 )
@@ -30,11 +29,7 @@ func (s *Storage) SaveMessage(message *types.MailData) error {
 			return err
 		}
 
-		parts := strings.Split(message.MessageId, "@")
-
-		id := parts[0][1 : len(parts[0])-1]
-
-		return b.Put([]byte(id), jsonData)
+		return b.Put([]byte(message.Id), jsonData)
 	})
 
 	return err

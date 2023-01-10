@@ -26,6 +26,7 @@ type PartData struct {
 }
 
 type MailData struct {
+	Id            string     `json:"id"`
 	MessageId     string     `json:"messageId"`
 	From          string     `json:"from"`
 	FromFormatted string     `json:"fromFormatted"`
@@ -33,4 +34,10 @@ type MailData struct {
 	Subject       string     `json:"subject"`
 	Date          time.Time  `json:"date"`
 	Parts         []PartData `json:"parts"`
+}
+
+type ApiResponse struct {
+	Page       int64       `json:"page"`
+	PagesCount int64       `json:"pagesCount"`
+	Messages   []*MailData `json:"messages"`
 }
