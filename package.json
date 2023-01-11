@@ -1,0 +1,38 @@
+{
+  "name": "mail-debug",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "Martin Bazik <martin@bazo.sk>",
+  "license": "MIT",
+  "packageManager": "yarn@3.3.1",
+  "type": "module",
+  "scripts": {
+    "dev": "dotenv vite ui",
+    "build": "tsc --project ui && vite build ui",
+    "preview": "vite preview",
+    "ci": "rome ci .",
+    "lint": "rome check --apply-suggested .",
+    "pretty": "rome format --write ."
+  },
+  "dependencies": {
+    "@headlessui/react": "^1.7.7",
+    "@heroicons/react": "^2.0.13",
+    "@tanstack/react-query": "^4.22.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-headless-pagination": "^0.2.1",
+    "react-letter": "^0.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.26",
+    "@types/react-dom": "^18.0.10",
+    "@vitejs/plugin-react-swc": "^3.0.1",
+    "autoprefixer": "^10.4.13",
+    "dotenv-cli": "^6.0.0",
+    "postcss": "^8.4.21",
+    "rome": "^11.0.0",
+    "tailwindcss": "^3.2.4",
+    "typescript": "^4.9.4",
+    "vite": "^4.0.4"
+  }
+}

@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"fmt"
+	"mail-debug/types"
 	"time"
 
 	"github.com/asdine/storm"
@@ -9,8 +9,7 @@ import (
 )
 
 type Storage struct {
-	db      *bolt.DB
-	stormDb *storm.DB
+	db *storm.DB
 }
 
 func NewStorage() *Storage {
@@ -22,26 +21,21 @@ func (s *Storage) Init(dbName string) error {
 	if err != nil {
 		return err
 	}
+	s.db = stormDb
 
-	db := stormDb.Bolt
+	err = stormDb.Init(&types.MailData{})
 
-	s.db = db
-	s.stormDb = stormDb
-	err = db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists([]byte("mail"))
-		if err != nil {
-			return fmt.Errorf("create bucket: %s", err)
-		}
-		return nil
-	})
-
-	if err != nil {
-		return err
-	}
-
-	return nil
+	/*
+		err = db.Bolt.View(func(tx *bolt.Tx) error {
+			return tx.ForEach(func(name []byte, _ *bolt.Bucket) error {
+				fmt.Println(string(name))
+				return nil
+			})
+		})
+	*/
+	return err
 }
 
 func (s *Storage) Close() {
-	s.stormDb.Close()
+	s.db.Close()
 }

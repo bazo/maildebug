@@ -19,6 +19,7 @@ func NewApi(storage *storage.Storage) *Api {
 
 func createResponse(w http.ResponseWriter, data interface{}, code int) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(data)
 }

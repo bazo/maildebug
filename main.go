@@ -12,6 +12,8 @@ import (
 
 	"github.com/emersion/go-smtp"
 	"github.com/jinzhu/configor"
+	"github.com/uptrace/bunrouter"
+	"github.com/uptrace/bunrouter/extra/reqlog"
 )
 
 var config types.Config
@@ -52,10 +54,20 @@ func main() {
 
 	go listenSmtp(s)
 
-	http.HandleFunc("/messages", api.LoadMessagesHandler)
+	router := bunrouter.New(
+		bunrouter.Use(reqlog.NewMiddleware(
+			reqlog.FromEnv("BUNDEBUG"),
+		)),
+	).Compat()
+
+	router.GET("/messages", api.LoadMessagesHandler)
+	router.GET("/messages/:id/attachments/:index", api.LoadMessagesAttachment)
+
+	//http.HandleFunc("/messages", api.LoadMessagesHandler)
+	//http.HandleFunc("/messages/:id/attachment/:index", api.LoadMessagesHandler)
 
 	log.Println("Starting API server at", config.APIPort)
-	http.ListenAndServe(":"+config.APIPort, nil)
+	http.ListenAndServe(":"+config.APIPort, router)
 }
 
 func listenSmtp(s *smtp.Server) {

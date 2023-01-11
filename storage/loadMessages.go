@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"encoding/json"
 	"mail-debug/types"
 
 	bolt "go.etcd.io/bbolt"
@@ -10,8 +9,9 @@ import (
 func (s *Storage) LoadMessages(page int64, limit int64) ([]*types.MailData, int64, error) {
 	var total int64 = 0
 	messages := make([]*types.MailData, 0)
-	err := s.stormDb.Bolt.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte("mail"))
+
+	err := s.db.Bolt.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("MailData"))
 
 		if b == nil {
 			return nil
@@ -29,19 +29,23 @@ func (s *Storage) LoadMessages(page int64, limit int64) ([]*types.MailData, int6
 		return messages, total, err
 	}
 
-	if err == nil {
-		skip := (page - 1) * limit
+	skip := (page - 1) * limit
 
-		query := s.stormDb.Select().Limit(int(limit)).Skip(int(skip)).OrderBy("Date").Reverse()
-		query.Bucket("mail")
+	//err = s.db.AllByIndex("Date", &messages, storm.Limit(int(limit)), storm.Skip(int(skip)), storm.Reverse())
 
-		query.RawEach(func(k, v []byte) error {
-			req := &types.MailData{}
-			json.Unmarshal(v, req)
-			messages = append(messages, req)
-			return nil
-		})
-	}
+	query := s.db.Select().Limit(int(limit)).Skip(int(skip)).Reverse().OrderBy("Date")
+
+	err = query.Each(new(types.MailData), func(record interface{}) error {
+		message := record.(*types.MailData)
+
+		for _, att := range message.Attachments {
+			att.Data = ""
+		}
+
+		messages = append(messages, message)
+
+		return nil
+	})
 
 	return messages, total, err
 }

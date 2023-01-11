@@ -1,0 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.w-96 {
+  width: 24rem;
+}
+
+.pl-96 {
+  padding-left: 24rem;
+}

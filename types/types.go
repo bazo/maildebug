@@ -1,6 +1,9 @@
 package types
 
-import "time"
+import (
+	"net/mail"
+	"time"
+)
 
 type Config struct {
 	SMTPPort string `default:"1025"`
@@ -20,20 +23,28 @@ type Config struct {
 }
 
 type PartData struct {
-	MediaType string
-	Data      string
-	Charset   string
+	MediaType string `json:"mediaType"`
+	Data      string `json:"data"`
+	Charset   string `json:"charset"`
+}
+
+type Attachment struct {
+	MediaType string `json:"mediaType"`
+	Data      string `json:"data,omitempty"`
+	Name      string `json:"name"`
 }
 
 type MailData struct {
-	Id            string     `json:"id"`
-	MessageId     string     `json:"messageId"`
-	From          string     `json:"from"`
-	FromFormatted string     `json:"fromFormatted"`
-	To            []string   `json:"to"`
-	Subject       string     `json:"subject"`
-	Date          time.Time  `json:"date"`
-	Parts         []PartData `json:"parts"`
+	Id            string        `json:"id" storm:"id"`
+	MessageId     string        `json:"messageId"`
+	From          string        `json:"from"`
+	FromFormatted string        `json:"fromFormatted"`
+	To            []string      `json:"to"`
+	Subject       string        `json:"subject"`
+	Date          time.Time     `json:"date" storm:"index"`
+	Parts         []*PartData   `json:"parts"`
+	Attachments   []*Attachment `json:"attachments"`
+	RawHeaders    mail.Header   `json:"rawHeaders"`
 }
 
 type ApiResponse struct {

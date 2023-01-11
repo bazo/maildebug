@@ -75,6 +75,10 @@ func (s *session) Data(r io.Reader) error {
 		return err
 	}
 
+	if err != nil {
+		return err
+	}
+
 	contentType := m.Header.Get("Content-Type")
 	if contentType != "" {
 		mediaType, params, err := mime.ParseMediaType(contentType)
@@ -83,20 +87,20 @@ func (s *session) Data(r io.Reader) error {
 		}
 
 		if strings.HasPrefix(mediaType, "multipart/") {
-			partData, _ := parsePart(m.Body, params)
+			partData, attachments, _ := parseParts(m.Body, params)
 			s.data.Parts = partData
+			s.data.Attachments = attachments
 		} else {
 			data, _ := io.ReadAll(m.Body)
-			s.data.Parts = []types.PartData{
-				newPartData(data, mediaType, params["charset"]),
+			part := newPartData(data, mediaType, params["charset"])
+			s.data.Parts = []*types.PartData{
+				&part,
 			}
 		}
-
 	}
 
 	dec := new(mime.WordDecoder)
 	from, err := dec.DecodeHeader(m.Header.Get("From"))
-	//to, _ := dec.DecodeHeader(m.Header.Get("To"))
 
 	if err != nil {
 		return err
@@ -114,20 +118,18 @@ func (s *session) Data(r io.Reader) error {
 		return err
 	}
 
-	//date := carbon.Parse(m.Header.Get("Date"))
-
 	messageId := m.Header.Get("Message-Id")
 
 	parts := strings.Split(messageId, "@")
 
-	id := parts[0][1 : len(parts[0])-1]
+	id := parts[0][1:len(parts[0])]
 
 	s.data.Id = id
 	s.data.MessageId = messageId
 	s.data.Date = date
 	s.data.FromFormatted = from
 	s.data.Subject = subject
-
+	s.data.RawHeaders = m.Header
 	s.onData(s.data)
 
 	return nil
@@ -147,20 +149,28 @@ func newPartData(data []byte, mediaType string, charset string) types.PartData {
 	}
 }
 
-func parsePart(mimeData io.Reader, params map[string]string) ([]types.PartData, error) {
+func newAttachmentData(data []byte, mediaType string, attachmentName string) types.Attachment {
+	return types.Attachment{
+		Data:      string(data),
+		MediaType: mediaType,
+		Name:      attachmentName,
+	}
+}
+
+func parseParts(mimeData io.Reader, params map[string]string) ([]*types.PartData, []*types.Attachment, error) {
 	boundary := params["boundary"]
 	// Instantiate a new io.Reader dedicated to MIME multipart parsing
 	// using multipart.NewReader()
 	reader := multipart.NewReader(mimeData, boundary)
 	if reader == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 
-	parts := []types.PartData{}
+	parts := []*types.PartData{}
+	attachments := []*types.Attachment{}
 
 	// Go through each of the MIME part of the message Body with NextPart(),
 	for {
-
 		newPart, err := reader.NextPart()
 		if err == io.EOF {
 			break
@@ -173,38 +183,60 @@ func parsePart(mimeData io.Reader, params map[string]string) ([]types.PartData, 
 		mediaType, params, err := mime.ParseMediaType(newPart.Header.Get("Content-Type"))
 
 		if err == nil && strings.HasPrefix(mediaType, "multipart/") {
-
 			// This is a new multipart to be handled recursively
-			parsePart(newPart, params)
-
+			p, a, err := parseParts(newPart, params)
+			if err == nil {
+				parts = append(parts, p...)
+				attachments = append(attachments, a...)
+			}
 		} else {
-
 			// Not a new nested multipart.
 			// We can do something here with the data of this single MIME part.
-			data, err := extractPartData(newPart)
+			isAttachment, data, err := extractPartData(newPart, mediaType, params)
 			if err == nil && data != nil {
-				parts = append(parts, newPartData(data, mediaType, params["charset"]))
+				if isAttachment {
+					attachment := newAttachmentData(data, mediaType, params["name"])
+					attachments = append(attachments, &attachment)
+				} else {
+					part := newPartData(data, mediaType, params["charset"])
+					parts = append(parts, &part)
+				}
 			}
 		}
-
 	}
 
-	return parts, nil
+	return parts, attachments, nil
 }
 
-func extractPartData(part *multipart.Part) ([]byte, error) {
-	partData, err := io.ReadAll(part)
+func extractPartData(part *multipart.Part, mediaType string, params map[string]string) (bool, []byte, error) {
+	partBytes, err := io.ReadAll(part)
 
 	if err != nil {
-		return nil, err
+		return false, nil, err
+	}
+
+	contentDisposition := part.Header.Get("Content-Disposition")
+
+	isAttachment := false
+	if strings.Contains(contentDisposition, "attachment") {
+		isAttachment = true
 	}
 
 	contentTransferEncoding := part.Header.Get("Content-Transfer-Encoding")
 
+	data, err := decodePart(partBytes, contentTransferEncoding)
+
+	if err != nil {
+		return false, nil, err
+	}
+
+	return isAttachment, data, nil
+}
+
+func decodePart(partData []byte, contentTransferEncoding string) ([]byte, error) {
 	var result []byte
 
 	switch {
-
 	case strings.Compare(contentTransferEncoding, "BASE64") == 0:
 		decodedContent, err := base64.StdEncoding.DecodeString(string(partData))
 		if err != nil {
