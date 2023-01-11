@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"mail-debug/types"
+	"maildebug/types"
 	"mime"
 	"mime/multipart"
 	"mime/quotedprintable"

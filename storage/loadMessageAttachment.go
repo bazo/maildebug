@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"mail-debug/types"
+	"maildebug/types"
 )
 
 func (s *Storage) LoadMessage(id string) (*types.MailData, error) {

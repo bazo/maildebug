@@ -3,10 +3,10 @@ package main
 import (
 	"flag"
 	"log"
-	"mail-debug/api"
-	"mail-debug/session"
-	"mail-debug/storage"
-	"mail-debug/types"
+	"maildebug/api"
+	"maildebug/session"
+	"maildebug/storage"
+	"maildebug/types"
 	"net/http"
 	"time"
 

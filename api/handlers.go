@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"mail-debug/types"
+	"maildebug/types"
 	"math"
 	"net/http"
 	"strconv"

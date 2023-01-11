@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"mail-debug/types"
+	"maildebug/types"
 	"time"
 
 	"github.com/asdine/storm"

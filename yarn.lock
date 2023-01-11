@@ -1360,9 +1360,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"mail-debug@workspace:.":
+"maildebug@workspace:.":
   version: 0.0.0-use.local
-  resolution: "mail-debug@workspace:."
+  resolution: "maildebug@workspace:."
   dependencies:
     "@headlessui/react": ^1.7.7
     "@heroicons/react": ^2.0.13

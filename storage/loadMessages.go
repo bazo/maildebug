@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"mail-debug/types"
+	"maildebug/types"
 
 	bolt "go.etcd.io/bbolt"
 )

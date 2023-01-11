@@ -14,4 +14,4 @@ dist
 rice-box.go
 maildebug.yml
 .env
-mail-debug
+maildebug

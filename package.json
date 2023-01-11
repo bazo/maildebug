@@ -1,5 +1,5 @@
 {
-  "name": "mail-debug",
+  "name": "maildebug",
   "version": "1.0.0",
   "main": "index.js",
   "author": "Martin Bazik <martin@bazo.sk>",

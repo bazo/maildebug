@@ -1,4 +1,4 @@
-module mail-debug
+module maildebug
 
 go 1.19
 

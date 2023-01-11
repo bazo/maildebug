@@ -3,7 +3,7 @@ package api
 import (
 	"encoding/json"
 	"log"
-	"mail-debug/storage"
+	"maildebug/storage"
 	"net/http"
 )
 
