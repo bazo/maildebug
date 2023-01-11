@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	rice "github.com/GeertJohan/go.rice"
 	"github.com/emersion/go-smtp"
 	"github.com/jinzhu/configor"
 	"github.com/uptrace/bunrouter"
@@ -20,15 +21,13 @@ var config types.Config
 
 func loadConfig() {
 	configFile := flag.String("file", "maildebug.yml", "configuration file")
-	configor.Load(&config, *configFile)
+	configor.New(&configor.Config{ENVPrefix: "MAILDEBUG"}).Load(&config, *configFile)
 }
 
 func main() {
 	loadConfig()
 
 	storage := storage.NewStorage()
-
-	log.Println(storage)
 
 	api := api.NewApi(storage)
 
@@ -41,6 +40,7 @@ func main() {
 
 	s := smtp.NewServer(session.NewBackend(config.Username, config.Password, func(data *types.MailData) error {
 		storage.SaveMessage(data)
+		log.Println("message saved", data.MessageId)
 		return nil
 	}))
 
@@ -52,19 +52,35 @@ func main() {
 	s.MaxRecipients = config.MaxRecipients
 	s.AllowInsecureAuth = config.AllowInsecureAuth
 
-	go listenSmtp(s)
-
 	router := bunrouter.New(
 		bunrouter.Use(reqlog.NewMiddleware(
 			reqlog.FromEnv("BUNDEBUG"),
 		)),
 	).Compat()
 
+	box, err := rice.FindBox("ui/dist")
+
+	if err != nil {
+		log.Fatalln("ui/dist folder not found")
+	}
+
+	httpBox := box.HTTPBox()
+	fileServer := http.FileServer(httpBox)
+
+	router.GET("/assets/*path", func(w http.ResponseWriter, r *http.Request) {
+		log.Println(r.URL.Path)
+
+		http.StripPrefix("/", fileServer).ServeHTTP(w, r)
+	})
+
+	router.GET("/", func(w http.ResponseWriter, r *http.Request) {
+		http.StripPrefix("/", fileServer).ServeHTTP(w, r)
+	})
+
 	router.GET("/messages", api.LoadMessagesHandler)
 	router.GET("/messages/:id/attachments/:index", api.LoadMessagesAttachment)
 
-	//http.HandleFunc("/messages", api.LoadMessagesHandler)
-	//http.HandleFunc("/messages/:id/attachment/:index", api.LoadMessagesHandler)
+	go listenSmtp(s)
 
 	log.Println("Starting API server at", config.APIPort)
 	http.ListenAndServe(":"+config.APIPort, router)

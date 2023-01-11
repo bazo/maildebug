@@ -21,7 +21,7 @@ export default function Example() {
 		async (): Promise<MessagesResponse> => {
 			return (
 				await fetch(
-					`${import.meta.env.VITE_API_URL}/messages?page=${page}`,
+					`${import.meta.env.VITE_API_URL || ""}/messages?page=${page}`,
 					{}
 				)
 			).json();

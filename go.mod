@@ -3,6 +3,7 @@ module mail-debug
 go 1.19
 
 require (
+	github.com/GeertJohan/go.rice v1.0.3
 	github.com/asdine/storm v2.1.2+incompatible
 	github.com/emersion/go-smtp v0.16.0
 	github.com/jinzhu/configor v1.2.1
@@ -15,6 +16,7 @@ require (
 	github.com/BurntSushi/toml v1.2.1 // indirect
 	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/Sereal/Sereal v0.0.0-20221130110801-16a4f76670cd // indirect
+	github.com/daaku/go.zipexe v1.0.2 // indirect
 	github.com/emersion/go-sasl v0.0.0-20220912192320-0145f2c60ead // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
