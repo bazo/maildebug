@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"log"
 	"maildebug/api"
@@ -8,6 +9,7 @@ import (
 	"maildebug/storage"
 	"maildebug/types"
 	"net/http"
+	"os"
 	"time"
 
 	rice "github.com/GeertJohan/go.rice"
@@ -38,7 +40,8 @@ func main() {
 		log.Fatal("Opening db: ", err)
 	}
 
-	s := smtp.NewServer(session.NewBackend(config.Username, config.Password, func(data *types.MailData) error {
+	s := smtp.NewServer(session.NewBackend(config.Username, config.Password, func(data *types.MailData, b bytes.Buffer) error {
+		os.WriteFile("data/messages/"+data.Id, b.Bytes(), os.ModePerm)
 		storage.SaveMessage(data)
 		log.Println("message saved", data.MessageId)
 		return nil

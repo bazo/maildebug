@@ -17,7 +17,7 @@ func NewStorage() *Storage {
 }
 
 func (s *Storage) Init(dbName string) error {
-	stormDb, err := storm.Open(dbName, storm.BoltOptions(0600, &bolt.Options{Timeout: 1 * time.Second}))
+	stormDb, err := storm.Open("data/"+dbName, storm.BoltOptions(0600, &bolt.Options{Timeout: 1 * time.Second}))
 	if err != nil {
 		return err
 	}

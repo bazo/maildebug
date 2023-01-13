@@ -17,7 +17,7 @@ import (
 	"github.com/emersion/go-smtp"
 )
 
-type dataCallback func(*types.MailData) error
+type dataCallback func(*types.MailData, bytes.Buffer) error
 
 // The Backend implements SMTP server methods.
 type Backend struct {
@@ -69,8 +69,17 @@ func (s *session) Rcpt(to string) error {
 }
 
 func (s *session) Data(r io.Reader) error {
-	m, err := mail.ReadMessage(r)
+	var b bytes.Buffer
+	t := io.TeeReader(r, &b)
 
+	// data, err := io.ReadAll(t)
+	// log.Println(data)
+	// if err != nil {
+	// 	return err
+	// }
+
+	m, err := mail.ReadMessage(t)
+	log.Println(b.String())
 	if err != nil {
 		return err
 	}
@@ -130,7 +139,7 @@ func (s *session) Data(r io.Reader) error {
 	s.data.FromFormatted = from
 	s.data.Subject = subject
 	s.data.RawHeaders = m.Header
-	s.onData(s.data)
+	s.onData(s.data, b)
 
 	return nil
 }

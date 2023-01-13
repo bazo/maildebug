@@ -123,23 +123,32 @@ export default function MessagePreview({ message }: MessagePreviewProps) {
 				</div>
 				<div className="hidden sm:block">
 					<nav className="flex space-x-4 pl-3 py-2" aria-label="Tabs">
-						{message.parts.map((part) => (
-							<div
-								key={part.mediaType}
-								className={classNames(
-									tab === part.mediaType
-										? "bg-gray-100 text-gray-700"
-										: "text-gray-500 hover:text-gray-700",
-									"px-3 py-2 font-medium text-sm rounded-md cursor-pointer"
-								)}
-								aria-current={
-									tab === part.mediaType ? "page" : undefined
+						{message.parts
+							.sort((a, b) => {
+								if (a.mediaType === "text/html") {
+									return -1;
 								}
-								onClick={() => setTab(part.mediaType)}
-							>
-								{part.mediaType}
-							</div>
-						))}
+								return a.mediaType > b.mediaType ? 1 : -1;
+							})
+							.map((part) => (
+								<div
+									key={part.mediaType}
+									className={classNames(
+										tab === part.mediaType
+											? "bg-gray-100 text-gray-700"
+											: "text-gray-500 hover:text-gray-700",
+										"px-3 py-2 font-medium text-sm rounded-md cursor-pointer"
+									)}
+									aria-current={
+										tab === part.mediaType
+											? "page"
+											: undefined
+									}
+									onClick={() => setTab(part.mediaType)}
+								>
+									{part.mediaType}
+								</div>
+							))}
 						<div
 							key={"rawHeaders"}
 							className={classNames(
@@ -173,7 +182,7 @@ export default function MessagePreview({ message }: MessagePreviewProps) {
 									{Object.entries(message.rawHeaders).map(
 										([key, values]) => {
 											return (
-												<div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
+												<div key={key} className="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
 													<dt className="text-sm font-medium text-gray-500">
 														{key}
 													</dt>
