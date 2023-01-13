@@ -6,7 +6,7 @@ import (
 )
 
 type Config struct {
-	SMTPPort string `default:"1025"`
+	SMTPPort string `default:"25"`
 	Username string `default:"username"`
 	Password string `default:"password"`
 
