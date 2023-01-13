@@ -68,7 +68,7 @@ export default function MessagePreview({ message }: MessagePreviewProps) {
 							<dt className="text-sm font-medium text-gray-500">
 								Attachments ({message.attachments.length})
 							</dt>
-							{message.attachments.length > 0 && (
+							{(message.attachments || []).length > 0 && (
 								<dd className="mt-1 text-sm text-gray-900">
 									<ul
 										role="list"
@@ -79,7 +79,7 @@ export default function MessagePreview({ message }: MessagePreviewProps) {
 												return (
 													<li
 														className="flex items-center justify-between py-3 pl-3 pr-4 text-sm"
-														key={key}
+														key={`att-${key}`}
 													>
 														<div className="flex w-0 flex-1 items-center">
 															<PaperClipIcon

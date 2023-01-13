@@ -1,0 +1,4 @@
+#!/bin/bash
+
+docker build . -t bazo/maildebug
+docker push bazo/maildebug:latest
