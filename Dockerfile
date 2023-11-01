@@ -1,5 +1,7 @@
 FROM golang:alpine AS builder
 
+ARG TARGETARCH
+
 RUN apk update && apk add --upgrade --no-cache git nodejs-current yarn upx binutils
 RUN go install github.com/GeertJohan/go.rice/rice@latest
 
@@ -23,7 +25,7 @@ COPY ${SRC} ${DEST}
 RUN yarn build
 
 RUN rice embed-go
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-w -s" -o ${APP_NAME}  .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -a -installsuffix cgo -ldflags="-w -s" -o ${APP_NAME}  .
 
 RUN strip --strip-unneeded ${APP_NAME}
 RUN upx ${APP_NAME}
