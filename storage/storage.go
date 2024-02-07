@@ -2,6 +2,7 @@ package storage
 
 import (
 	"maildebug/types"
+	"os"
 	"time"
 
 	"github.com/asdine/storm"
@@ -17,6 +18,12 @@ func NewStorage() *Storage {
 }
 
 func (s *Storage) Init(dbName string) error {
+
+	_, err := os.Stat("data")
+	if err != nil {
+		os.Mkdir("data", os.ModePerm)
+	}
+
 	stormDb, err := storm.Open("data/"+dbName, storm.BoltOptions(0600, &bolt.Options{Timeout: 1 * time.Second}))
 	if err != nil {
 		return err

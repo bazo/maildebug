@@ -71,8 +71,6 @@ func main() {
 	fileServer := http.FileServer(httpBox)
 
 	router.GET("/assets/*path", func(w http.ResponseWriter, r *http.Request) {
-		log.Println(r.URL.Path)
-
 		http.StripPrefix("/", fileServer).ServeHTTP(w, r)
 	})
 

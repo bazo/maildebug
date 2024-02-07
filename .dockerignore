@@ -14,9 +14,6 @@
 .env.test.local
 .env.production.local
 
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 vendor
 
 *.bolt
@@ -25,3 +22,10 @@ maildebug.yml
 
 rice-box.go
 maildebug
+
+.vscode
+/tmp
+.github
+biome.json
+editorconfig
+build-and-push

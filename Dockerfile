@@ -1,8 +1,19 @@
+### bun
+FROM oven/bun:alpine as bun-builder
+
+WORKDIR /tmp
+COPY ui ui
+COPY bun.lockb package.json postcss.config.cjs tailwind.config.cjs ./
+
+RUN bun install --frozen-lockfile
+RUN bun run build
+
+### golang
 FROM golang:alpine AS builder
 
 ARG TARGETARCH
 
-RUN apk update && apk add --upgrade --no-cache git nodejs-current yarn upx binutils
+RUN apk update && apk add --upgrade --no-cache git upx binutils
 RUN go install github.com/GeertJohan/go.rice/rice@latest
 
 ARG APP_NAME="maildebug"
@@ -11,18 +22,18 @@ ARG DEST=/${APP_NAME}/
 
 WORKDIR ${DEST}
 
-COPY go.mod .
-COPY go.sum .
+COPY --from=bun-builder /tmp/ui/dist ui/dist
+
+COPY api api
+COPY session session 
+COPY storage storage
+COPY types types
+COPY main.go go.mod go.sum ./
+
+RUN pwd
+RUN ls -la
 
 RUN go mod download
-
-COPY package.json yarn.lock .yarnrc.yml ./
-COPY .yarn/ ./.yarn
-
-RUN yarn
-
-COPY ${SRC} ${DEST}
-RUN yarn build
 
 RUN rice embed-go
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -a -installsuffix cgo -ldflags="-w -s" -o ${APP_NAME}  .

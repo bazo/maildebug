@@ -73,17 +73,12 @@ func (s *session) Data(r io.Reader) error {
 	t := io.TeeReader(r, &b)
 
 	// data, err := io.ReadAll(t)
-	// log.Println(data)
+	// log.Println(string(data))
 	// if err != nil {
 	// 	return err
 	// }
 
 	m, err := mail.ReadMessage(t)
-	log.Println(b.String())
-	if err != nil {
-		return err
-	}
-
 	if err != nil {
 		return err
 	}
@@ -100,10 +95,9 @@ func (s *session) Data(r io.Reader) error {
 			s.data.Parts = partData
 			s.data.Attachments = attachments
 		} else {
-			data, _ := io.ReadAll(m.Body)
-			part := newPartData(data, mediaType, params["charset"])
+			part, _ := parsePart(m.Body, m.Header)
 			s.data.Parts = []*types.PartData{
-				&part,
+				part,
 			}
 		}
 	}
@@ -217,6 +211,29 @@ func parseParts(mimeData io.Reader, params map[string]string) ([]*types.PartData
 	return parts, attachments, nil
 }
 
+func parsePart(mimeData io.Reader, header mail.Header) (*types.PartData, error) {
+	mediaType, params, err := mime.ParseMediaType(header.Get("Content-Type"))
+
+	if err != nil {
+		return nil, err
+	}
+
+	partBytes, err := io.ReadAll(mimeData)
+	if err != nil {
+		return nil, err
+	}
+	contentTransferEncoding := header.Get("Content-Transfer-Encoding")
+
+	data, err := decodePart(partBytes, contentTransferEncoding)
+
+	if err != nil {
+		return nil, err
+	}
+
+	part := newPartData(data, mediaType, params["charset"])
+	return &part, nil
+}
+
 func extractPartData(part *multipart.Part, mediaType string, params map[string]string) (bool, []byte, error) {
 	partBytes, err := io.ReadAll(part)
 
@@ -246,7 +263,7 @@ func decodePart(partData []byte, contentTransferEncoding string) ([]byte, error)
 	var result []byte
 
 	switch {
-	case strings.Compare(contentTransferEncoding, "BASE64") == 0:
+	case strings.Compare(strings.ToUpper(contentTransferEncoding), "BASE64") == 0:
 		decodedContent, err := base64.StdEncoding.DecodeString(string(partData))
 		if err != nil {
 			log.Println("Error decoding base64 -", err)
@@ -255,7 +272,7 @@ func decodePart(partData []byte, contentTransferEncoding string) ([]byte, error)
 			result = decodedContent
 		}
 
-	case strings.Compare(contentTransferEncoding, "QUOTED-PRINTABLE") == 0:
+	case strings.Compare(strings.ToUpper(contentTransferEncoding), "QUOTED-PRINTABLE") == 0:
 		decodedContent, err := io.ReadAll(quotedprintable.NewReader(bytes.NewReader(partData)))
 		if err != nil {
 			log.Println("Error decoding quoted-printable -", err)
