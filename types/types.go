@@ -17,9 +17,9 @@ type Config struct {
 	ReadTimeout  int    `default:"10"`
 	WriteTimeout int    `default:"10"`
 	//1024 * 1024
-	MaxMessageBytes   int  `default:"1048576"`
-	MaxRecipients     int  `default:"50"`
-	AllowInsecureAuth bool `default:"true"`
+	MaxMessageBytes   int64 `default:"1048576"`
+	MaxRecipients     int   `default:"50"`
+	AllowInsecureAuth bool  `default:"true"`
 }
 
 type PartData struct {

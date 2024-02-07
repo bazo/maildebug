@@ -63,7 +63,7 @@ func (s *session) Mail(from string, opts *smtp.MailOptions) error {
 	return nil
 }
 
-func (s *session) Rcpt(to string) error {
+func (s *session) Rcpt(to string, options *smtp.RcptOptions) error {
 	s.data.To = append(s.data.To, to)
 	return nil
 }

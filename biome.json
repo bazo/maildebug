@@ -35,7 +35,7 @@
 		]
 	},
 	"formatter": {
-		"indentSize": 4,
+		"indentWidth": 4,
 		"lineWidth": 100,
 		"ignore": [
 			"*.js",

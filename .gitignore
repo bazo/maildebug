@@ -3,13 +3,6 @@ tmp
 node_modules
 dist
 
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/sdks
-!.yarn/versions
 *.log
 rice-box.go
 maildebug.yml
