@@ -3,9 +3,11 @@ FROM oven/bun:alpine as bun-builder
 
 WORKDIR /tmp
 COPY ui ui
-COPY bun.lockb package.json postcss.config.cjs tailwind.config.cjs ./
 
 RUN bun install --frozen-lockfile
+
+WORKDIR /tmp/ui
+
 RUN bun run build
 
 ### golang
