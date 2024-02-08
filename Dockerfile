@@ -3,7 +3,7 @@ FROM oven/bun:alpine as bun-builder
 
 WORKDIR /tmp
 COPY ui ui
-
+COPY package.json package.json
 RUN bun install --frozen-lockfile
 
 WORKDIR /tmp/ui
