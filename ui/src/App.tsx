@@ -141,10 +141,8 @@ export default function Example() {
 											className={classNames(
 												"flex items-center mr-2 text-gray-500 hover:text-gray-600 dark:hover:text-gray-200 focus:outline-none",
 												{
-													"cursor-pointer":
-														page !== data?.pagesCount || 1 - 1,
-													"opacity-50":
-														page === data?.pagesCount || 1 - 1,
+													"cursor-pointer": page !== pagesCount - 1,
+													"opacity-50": page === pagesCount - 1,
 												},
 											)}
 										>
