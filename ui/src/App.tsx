@@ -2,7 +2,13 @@ import { useState } from "react";
 import { Pagination } from "react-headless-pagination";
 import { useQuery } from "@tanstack/react-query";
 import type { Message, MessagesResponse } from "types";
-import { ArrowLeftIcon, ArrowRightIcon, EnvelopeIcon } from "@heroicons/react/20/solid";
+import {
+	ArrowLeftIcon,
+	ArrowRightIcon,
+	EnvelopeIcon,
+	EnvelopeOpenIcon,
+	ArrowPathIcon,
+} from "@heroicons/react/20/solid";
 import MessagePreview from "./MessagePreview";
 import { classNames, formatDate } from "./helpers";
 
@@ -10,34 +16,45 @@ export default function Example() {
 	const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
 	const [page, setPage] = useState(1);
 
-	const loadMessages = useQuery<MessagesResponse>({
+	const { data, refetch } = useQuery<MessagesResponse>({
 		queryKey: ["messages", page],
 		queryFn: async (): Promise<MessagesResponse> => {
 			return (
-				await fetch(`${import.meta.env.VITE_API_URL || ""}/messages?page=${page}`, {})
+				await fetch(`${import.meta.env.VITE_API_URL || ""}/messages?page=${page}`, {
+					mode: "cors",
+				})
 			).json();
 		},
 	});
 
-	const pagesCount = loadMessages.data?.pagesCount || 1;
+	const pagesCount = data?.pagesCount || 1;
 
 	return (
 		<>
 			<div className="flex">
 				<div className="fixed inset-y-0 flex w-96 flex-col">
-					{/* Sidebar component, swap this element with another sidebar if you like */}
 					<div className="flex min-h-0 flex-1 flex-col bg-gray-800">
 						<div className="flex flex-1 flex-col overflow-y-auto pt-5 pb-4">
-							<div className="flex flex-shrink-0 items-center px-4 text-white">
-								<EnvelopeIcon className="mr-1.5 h-5 w-5 flex-shrink-0 text-gray-400" />{" "}
-								Mail Debug
+							<div className="flex justify-between items-center">
+								<span className="flex flex-shrink-0 items-center px-4 text-white">
+									<EnvelopeIcon className="mr-1.5 h-5 w-5 flex-shrink-0 text-gray-400" />{" "}
+									Mail Debug
+								</span>
+								<ArrowPathIcon
+									className="h-5 w-5 mr-1.5 text-gray-400 cursor-pointer hover:text-white"
+									onClick={() => refetch()}
+								/>
 							</div>
 							<nav className="mt-5 flex-1 space-y-1 px-2">
 								<ul role="list" className="divide-y divide-gray-200">
-									{loadMessages.data?.messages.map((message) => (
+									{data?.messages.map((message) => (
 										<li
 											key={message.id}
-											className="relative bg-white py-5 px-4 focus-within:ring-2 focus-within:ring-inset focus-within:ring-indigo-600 hover:bg-gray-50"
+											className={`relative bg-white py-5 px-4 hover:bg-blue-100${
+												selectedMessage?.id === message.id
+													? " bg-blue-200"
+													: ""
+											}`}
 											onClick={() => {
 												setSelectedMessage(message);
 											}}
@@ -53,10 +70,17 @@ export default function Example() {
 															aria-hidden="true"
 														/>
 														<p className="truncate text-sm font-medium text-gray-900 flex items-center">
-															<EnvelopeIcon
-																className="mr-1.5 h-5 w-5 flex-shrink-0 text-gray-400"
-																aria-hidden="true"
-															/>
+															{selectedMessage?.id === message.id ? (
+																<EnvelopeOpenIcon
+																	className="mr-1.5 h-5 w-5 flex-shrink-0 text-gray-400"
+																	aria-hidden="true"
+																/>
+															) : (
+																<EnvelopeIcon
+																	className="mr-1.5 h-5 w-5 flex-shrink-0 text-gray-400"
+																	aria-hidden="true"
+																/>
+															)}
 															{message.from}
 														</p>
 														<p className="truncate text-sm text-gray-500">
@@ -118,11 +142,9 @@ export default function Example() {
 												"flex items-center mr-2 text-gray-500 hover:text-gray-600 dark:hover:text-gray-200 focus:outline-none",
 												{
 													"cursor-pointer":
-														page !== loadMessages.data?.pagesCount ||
-														1 - 1,
+														page !== data?.pagesCount || 1 - 1,
 													"opacity-50":
-														page === loadMessages.data?.pagesCount ||
-														1 - 1,
+														page === data?.pagesCount || 1 - 1,
 												},
 											)}
 										>

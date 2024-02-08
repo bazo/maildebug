@@ -1,10 +1,14 @@
 version: 3
 
 dotenv: [".env"]
-  
 
 tasks:
-  client:
-    dir: ui
-    cmds:
-      - bun dev
+    client:
+        dir: ui
+        cmds:
+            - bun dev
+
+    client:build:
+        dir: ui
+        cmds:
+            - bun run build

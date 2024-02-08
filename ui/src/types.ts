@@ -14,7 +14,7 @@ export interface Message {
 	date: string;
 	parts: Part[];
 	attachments: Attachment[];
-	rawHeaders: Record<string, string[]>
+	rawHeaders: Record<string, string[]>;
 }
 
 export interface Part {
