@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Pagination } from "react-headless-pagination";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type { Message, MessagesResponse } from "types";
 import {
 	ArrowLeftIcon,
@@ -8,11 +8,12 @@ import {
 	EnvelopeIcon,
 	EnvelopeOpenIcon,
 	ArrowPathIcon,
+	TrashIcon,
 } from "@heroicons/react/20/solid";
 import MessagePreview from "./MessagePreview";
 import { classNames, formatDate } from "./helpers";
 
-export default function Example() {
+export default function App() {
 	const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
 	const [page, setPage] = useState(1);
 
@@ -29,6 +30,24 @@ export default function Example() {
 
 	const pagesCount = data?.pagesCount || 1;
 
+	const trashMutation = useMutation({
+		mutationFn: () => {
+			return fetch(`${import.meta.env.VITE_API_URL || ""}/messages`, {
+				method: "DELETE",
+				mode: "cors",
+			});
+		},
+		onSuccess() {
+			refetch();
+		},
+	});
+
+	const handleDeleteAll = () => {
+		if (confirm("Really delete all message?")) {
+			trashMutation.mutate();
+		}
+	};
+
 	return (
 		<>
 			<div className="flex">
@@ -40,10 +59,16 @@ export default function Example() {
 									<EnvelopeIcon className="mr-1.5 h-5 w-5 flex-shrink-0 text-gray-400" />{" "}
 									Mail Debug
 								</span>
-								<ArrowPathIcon
-									className="h-5 w-5 mr-1.5 text-gray-400 cursor-pointer hover:text-white"
-									onClick={() => refetch()}
-								/>
+								<div className="flex">
+									<TrashIcon
+										className="h-5 w-5 mr-1.5 text-gray-400 cursor-pointer hover:text-white"
+										onClick={handleDeleteAll}
+									/>
+									<ArrowPathIcon
+										className="h-5 w-5 mr-1.5 text-gray-400 cursor-pointer hover:text-white"
+										onClick={() => refetch()}
+									/>
+								</div>
 							</div>
 							<nav className="mt-5 flex-1 space-y-1 px-2">
 								<ul role="list" className="divide-y divide-gray-200">

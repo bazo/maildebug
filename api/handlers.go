@@ -106,3 +106,17 @@ func (api *Api) LoadMessagesAttachment(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", attachment.MediaType)
 	io.Copy(w, bytes.NewReader(b))
 }
+
+func (api *Api) DeleteMessagesHandler(w http.ResponseWriter, r *http.Request) {
+
+	err := api.storage.DeleteMessages()
+
+	if err != nil {
+		createErrorResponse(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	response := types.ApiResponse{}
+	w.Header().Set("Access-Control-Allow-Methods", "*")
+	createResponse(w, response, http.StatusOK)
+}

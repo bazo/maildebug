@@ -78,8 +78,15 @@ func main() {
 		http.StripPrefix("/", fileServer).ServeHTTP(w, r)
 	})
 
+	router.OPTIONS("/*p", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "*")
+		w.WriteHeader(http.StatusOK)
+	})
+
 	router.GET("/messages", api.LoadMessagesHandler)
 	router.GET("/messages/:id/attachments/:index", api.LoadMessagesAttachment)
+	router.DELETE("/messages", api.DeleteMessagesHandler)
 
 	go listenSmtp(s)
 
