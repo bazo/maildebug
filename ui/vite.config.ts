@@ -4,7 +4,7 @@ import react from "@vitejs/plugin-react-swc";
 
 // https://vitejs.dev/config/
 const plugins = [react()];
-if (process.env.NODE_ENV === "development") {
+if (process.env.MILLION_LINT_ENABLED === "1") {
 	plugins.push(MillionLint.vite());
 }
 export default defineConfig({
