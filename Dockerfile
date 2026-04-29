@@ -17,7 +17,6 @@ FROM golang:alpine AS builder
 ARG TARGETARCH
 
 RUN apk update && apk add --upgrade --no-cache git upx binutils
-RUN go install github.com/GeertJohan/go.rice/rice@latest
 
 ARG APP_NAME="maildebug"
 ARG SRC=.
@@ -38,7 +37,6 @@ RUN ls -la
 
 RUN go mod download
 
-RUN rice embed-go
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -a -installsuffix cgo -ldflags="-w -s" -o ${APP_NAME}  .
 
 RUN strip --strip-unneeded ${APP_NAME}

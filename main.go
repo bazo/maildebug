@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"embed"
 	"flag"
+	"io/fs"
 	"log"
 	"maildebug/api"
 	"maildebug/session"
@@ -12,12 +14,14 @@ import (
 	"os"
 	"time"
 
-	rice "github.com/GeertJohan/go.rice"
 	"github.com/emersion/go-smtp"
 	"github.com/jinzhu/configor"
 	"github.com/uptrace/bunrouter"
 	"github.com/uptrace/bunrouter/extra/reqlog"
 )
+
+//go:embed ui/dist
+var embeddedFiles embed.FS
 
 var config types.Config
 
@@ -61,14 +65,12 @@ func main() {
 		)),
 	).Compat()
 
-	box, err := rice.FindBox("ui/dist")
-
+	distFS, err := fs.Sub(embeddedFiles, "ui/dist")
 	if err != nil {
-		log.Fatalln("ui/dist folder not found")
+		log.Fatal("Embedding ui/dist: ", err)
 	}
 
-	httpBox := box.HTTPBox()
-	fileServer := http.FileServer(httpBox)
+	fileServer := http.FileServer(http.FS(distFS))
 
 	router.GET("/assets/*path", func(w http.ResponseWriter, r *http.Request) {
 		http.StripPrefix("/", fileServer).ServeHTTP(w, r)
