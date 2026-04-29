@@ -9,10 +9,10 @@ import {
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Pagination } from "react-headless-pagination";
-import type { Message, MessagesResponse } from "types";
+import type { Message, MessagesResponse } from "@/types";
 
-import { classNames, formatDate } from "./helpers";
-import MessagePreview from "./message-preview";
+import { classNames, formatDate } from "@/helpers";
+import MessagePreview from "@/message-preview";
 
 export default function App() {
 	const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
