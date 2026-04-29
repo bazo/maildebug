@@ -1,9 +1,17 @@
 {
 	"name": "maildebug",
 	"version": "1.0.0",
-	"author": "Martin Bazik <martin@bazo.sk>",
 	"license": "MIT",
+	"author": "Martin Bazik <martin@bazo.sk>",
 	"workspaces": [
 		"ui"
-	]
+	],
+	"scripts": {
+		"format": "oxfmt . -c .oxfmtrc.json",
+		"lint": "oxlint -c .oxlintrc.json"
+	},
+	"devDependencies": {
+		"oxfmt": "0.47.0",
+		"oxlint": "1.62.0"
+	}
 }

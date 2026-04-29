@@ -1,8 +1,9 @@
-import type { Message } from "types";
-import { Letter } from "react-letter";
 import { PaperClipIcon } from "@heroicons/react/20/solid";
-import { classNames, formatDate } from "./helpers";
 import { useState } from "react";
+import { Letter } from "react-letter";
+import type { Message } from "types";
+
+import { classNames, formatDate } from "./helpers";
 
 interface MessagePreviewProps {
 	message: Message;

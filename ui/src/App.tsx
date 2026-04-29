@@ -1,7 +1,3 @@
-import { useState } from "react";
-import { Pagination } from "react-headless-pagination";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import type { Message, MessagesResponse } from "types";
 import {
 	ArrowLeftIcon,
 	ArrowRightIcon,
@@ -10,8 +6,13 @@ import {
 	ArrowPathIcon,
 	TrashIcon,
 } from "@heroicons/react/20/solid";
-import MessagePreview from "./MessagePreview";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { Pagination } from "react-headless-pagination";
+import type { Message, MessagesResponse } from "types";
+
 import { classNames, formatDate } from "./helpers";
+import MessagePreview from "./MessagePreview";
 
 export default function App() {
 	const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
