@@ -26,6 +26,5 @@ maildebug
 .vscode
 /tmp
 .github
-biome.json
 editorconfig
 build-and-push
