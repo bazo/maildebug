@@ -8,12 +8,15 @@
 	],
 	"scripts": {
 		"format": "oxfmt . -c .oxfmtrc.json",
-		"lint": "oxlint -c .oxlintrc.json"
+		"lint": "oxlint -c .oxlintrc.json",
+		"lefthook:install": "lefthook install",
+		"postinstall": "lefthook install"
 	},
 	"dependencies": {
 		"@vitejs/plugin-react": "^6.0.1"
 	},
 	"devDependencies": {
+		"lefthook": "^2.1.6",
 		"oxfmt": "0.47.0",
 		"oxlint": "1.62.0"
 	}

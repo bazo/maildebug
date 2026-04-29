@@ -1,0 +1,46 @@
+pre-commit:
+    parallel: true
+    commands:
+        oxfmt:
+            glob: "*.{js,jsx,ts,tsx,json}"
+            run: bunx oxfmt -c .oxfmtrc.json --check {staged_files}
+            stage_fixed: true
+
+        oxlint:
+            glob: "*.{js,jsx,ts,tsx}"
+            run: bunx oxlint -c .oxlintrc.json {staged_files}
+
+        tsc:
+            glob: "ui/**/*.{ts,tsx}"
+            root: "ui/"
+            run: bunx tsc -b --noEmit
+
+        gofmt:
+            glob: "*.go"
+            run: |
+                unformatted=$(gofmt -l {staged_files})
+                if [ -n "$unformatted" ]; then
+                    echo "Go files need formatting:"
+                    echo "$unformatted"
+                    exit 1
+                fi
+
+        govet:
+            glob: "*.go"
+            run: go vet ./...
+
+        gobuild:
+            glob: "*.go"
+            run: go build ./...
+
+pre-push:
+    parallel: true
+    commands:
+        tsc:
+            glob: "ui/**/*.{ts,tsx}"
+            root: "ui/"
+            run: bunx tsc -b --noEmit
+
+        gobuild:
+            glob: "*.go"
+            run: go build ./...
