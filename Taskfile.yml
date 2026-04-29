@@ -25,3 +25,36 @@ tasks:
         dir: email-test
         cmds:
             - bun run send.tsx --email {{.CLI_ARGS}}
+
+    docker:buildx:
+        desc: Ensure a multi-platform buildx builder is available
+        cmds:
+            - |
+                if ! docker buildx inspect maildebug-builder >/dev/null 2>&1; then
+                    docker buildx create --name maildebug-builder --use
+                else
+                    docker buildx use maildebug-builder
+                fi
+
+    docker:build:
+        desc: Build image locally for the current architecture
+        vars:
+            REPO: '{{.REPO | default "bazo/maildebug"}}'
+            BRANCH:
+                sh: git rev-parse --abbrev-ref HEAD | tr '/' '-'
+            SHA:
+                sh: git rev-parse --short HEAD
+        cmds:
+            - docker build -t maildebug -t {{.REPO}}:latest -t {{.REPO}}:{{.BRANCH}}-{{.SHA}} .
+
+    docker:push:
+        desc: Build and push multi-platform image to DockerHub
+        deps: [docker:buildx]
+        vars:
+            REPO: '{{.REPO | default "bazo/maildebug"}}'
+            BRANCH:
+                sh: git rev-parse --abbrev-ref HEAD | tr '/' '-'
+            SHA:
+                sh: git rev-parse --short HEAD
+        cmds:
+            - docker buildx build --platform linux/amd64,linux/arm64 -t {{.REPO}}:latest -t {{.REPO}}:{{.BRANCH}}-{{.SHA}} --push .

@@ -1,11 +1,11 @@
 ### bun
-FROM oven/bun:alpine as bun-builder
+FROM oven/bun:alpine AS bun-builder
 
 WORKDIR /tmp
 COPY ui ui
 COPY package.json package.json
-COPY bun.lockb bun.lockb 
-RUN bun install --frozen-lockfile
+COPY bun.lock bun.lock
+RUN bun install --frozen-lockfile --ignore-scripts
 
 WORKDIR /tmp/ui
 
@@ -45,7 +45,7 @@ RUN upx ${APP_NAME}
 FROM scratch
 
 ARG APP_NAME="maildebug"
-ENV APP_CMD "./${APP_NAME}"
+ENV APP_CMD="./${APP_NAME}"
 
 COPY --from=builder /${APP_NAME}/${APP_NAME} .
 

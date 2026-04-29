@@ -27,12 +27,21 @@ jobs:
                   username: ${{ secrets.DOCKERHUB_USERNAME }}
                   password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+            - name: Docker meta
+              id: meta
+              uses: docker/metadata-action@v5
+              with:
+                  images: bazo/maildebug
+                  tags: |
+                      type=raw,value=latest
+                      type=raw,value={{branch}}-{{sha}}
+
             - name: Build & Push
               uses: docker/build-push-action@v5
               with:
                   push: true
                   context: .
                   platforms: linux/amd64,linux/arm64
-                  tags: bazo/maildebug:latest
+                  tags: ${{ steps.meta.outputs.tags }}
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
