@@ -6,20 +6,19 @@ import (
 )
 
 type Config struct {
-	SMTPPort string `default:"1025"`
-	Username string `default:"username"`
-	Password string `default:"password"`
+	SMTPPort string
+	Username string
+	Password string
 
-	APIPort string `default:"8100"`
-	DbName  string `default:"mail.bolt"`
+	APIPort string
+	DbName  string
 
-	Domain       string `default:"localhost"`
-	ReadTimeout  int    `default:"10"`
-	WriteTimeout int    `default:"10"`
-	//1024 * 1024
-	MaxMessageBytes   int64 `default:"1048576"`
-	MaxRecipients     int   `default:"50"`
-	AllowInsecureAuth bool  `default:"true"`
+	Domain            string
+	ReadTimeout       int
+	WriteTimeout      int
+	MaxMessageBytes   int64
+	MaxRecipients     int
+	AllowInsecureAuth bool
 }
 
 type PartData struct {

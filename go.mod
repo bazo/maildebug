@@ -5,14 +5,13 @@ go 1.25.0
 require (
 	github.com/asdine/storm v2.1.2+incompatible
 	github.com/emersion/go-smtp v0.24.0
-	github.com/jinzhu/configor v1.2.2
+	github.com/joho/godotenv v1.5.1
 	github.com/uptrace/bunrouter v1.0.23
 	github.com/uptrace/bunrouter/extra/reqlog v1.0.23
 	go.etcd.io/bbolt v1.4.3
 )
 
 require (
-	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/Sereal/Sereal v0.0.0-20221130110801-16a4f76670cd // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -28,5 +27,4 @@ require (
 	go.opentelemetry.io/otel/trace v1.43.0 // indirect
 	golang.org/x/sys v0.43.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
