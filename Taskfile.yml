@@ -1,6 +1,6 @@
 version: 3
 
-dotenv: [".env"]
+dotenv: ["maildebug.env", ".env"]
 
 tasks:
     client:
@@ -20,3 +20,8 @@ tasks:
     server:
         cmds:
             - air
+
+    test:
+        dir: email-test
+        cmds:
+            - bun run send.tsx --email {{.CLI_ARGS}}

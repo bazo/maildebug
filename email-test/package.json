@@ -1,0 +1,24 @@
+{
+	"name": "email-test",
+	"version": "1.1.0",
+	"private": true,
+	"scripts": {
+		"build": "email build",
+		"dev": "email dev",
+		"export": "email export"
+	},
+	"dependencies": {
+		"@types/nodemailer": "^8.0.0",
+		"nodemailer": "^8.0.7",
+		"react": "19.2.5",
+		"react-dom": "19.2.5",
+		"react-email": "6.0.5",
+		"zod": "^4.4.1"
+	},
+	"devDependencies": {
+		"@react-email/ui": "6.0.5",
+		"@types/react": "19.2.14",
+		"@types/react-dom": "19.2.3",
+		"bun-types": "latest"
+	}
+}

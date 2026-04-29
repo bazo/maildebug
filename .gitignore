@@ -5,5 +5,6 @@ dist
 
 *.log
 maildebug.yml
+*.env
 .env
 maildebug
