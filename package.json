@@ -10,11 +10,11 @@
 		"format": "oxfmt . -c .oxfmtrc.json",
 		"lint": "oxlint -c .oxlintrc.json"
 	},
+	"dependencies": {
+		"@vitejs/plugin-react": "^6.0.1"
+	},
 	"devDependencies": {
 		"oxfmt": "0.47.0",
 		"oxlint": "1.62.0"
-	},
-	"dependencies": {
-		"@vitejs/plugin-react": "^6.0.1"
 	}
 }
