@@ -12,3 +12,11 @@ tasks:
         dir: ui
         cmds:
             - bun run build
+
+    format:
+        cmds:
+            - bun run format
+
+    server:
+        cmds:
+            - air
