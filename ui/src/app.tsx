@@ -12,7 +12,7 @@ import { Pagination } from "react-headless-pagination";
 import type { Message, MessagesResponse } from "types";
 
 import { classNames, formatDate } from "./helpers";
-import MessagePreview from "./MessagePreview";
+import MessagePreview from "./message-preview";
 
 export default function App() {
 	const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
