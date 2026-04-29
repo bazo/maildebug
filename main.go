@@ -158,6 +158,10 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 	})
 
+	router.GET("/.well-known/appspecific/com.chrome.devtools.json", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+
 	router.GET("/messages", api.LoadMessagesHandler)
 	router.GET("/messages/:id/attachments/:index", api.LoadMessagesAttachment)
 	router.DELETE("/messages", api.DeleteMessagesHandler)
