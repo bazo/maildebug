@@ -3,7 +3,7 @@ pre-commit:
     commands:
         oxfmt:
             glob: "*.{js,jsx,ts,tsx,json}"
-            run: bunx oxfmt -c .oxfmtrc.json --check {staged_files}
+            run: bunx oxfmt -c .oxfmtrc.json {staged_files}
             stage_fixed: true
 
         oxlint:
