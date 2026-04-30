@@ -27,6 +27,11 @@ func createResponse(w http.ResponseWriter, data interface{}, code int) {
 func createErrorResponse(w http.ResponseWriter, err error, code int) {
 	log.Println(err)
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(err)
+	msg := ""
+	if err != nil {
+		msg = err.Error()
+	}
+	json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }

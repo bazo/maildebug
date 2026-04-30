@@ -3,6 +3,8 @@ version: 3
 dotenv: ["maildebug.env", ".env"]
 
 tasks:
+    default: task --list-all
+    
     client:
         dir: ui
         cmds:

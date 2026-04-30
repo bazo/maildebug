@@ -19,9 +19,8 @@ func NewStorage() *Storage {
 
 func (s *Storage) Init(dbName string) error {
 
-	_, err := os.Stat("data")
-	if err != nil {
-		os.Mkdir("data", os.ModePerm)
+	if err := os.MkdirAll("data/messages", 0755); err != nil {
+		return err
 	}
 
 	stormDb, err := storm.Open("data/"+dbName, storm.BoltOptions(0600, &bolt.Options{Timeout: 1 * time.Second}))
@@ -44,5 +43,7 @@ func (s *Storage) Init(dbName string) error {
 }
 
 func (s *Storage) Close() {
-	s.db.Close()
+	if s.db != nil {
+		s.db.Close()
+	}
 }

@@ -1,8 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"embed"
+	"fmt"
 	"io/fs"
 	"log"
 	"maildebug/api"
@@ -109,17 +109,21 @@ func main() {
 
 	api := api.NewApi(storage)
 
-	defer storage.Close()
-	err := storage.Init(config.DbName)
-
-	if err != nil {
+	if err := storage.Init(config.DbName); err != nil {
 		log.Fatal("Opening db: ", err)
 	}
+	defer storage.Close()
 
-	s := smtp.NewServer(session.NewBackend(config.Username, config.Password, func(data *types.MailData, b bytes.Buffer) error {
-		os.WriteFile("data/messages/"+data.Id, b.Bytes(), os.ModePerm)
-		storage.SaveMessage(data)
-		log.Println("message saved", data.MessageId)
+	s := smtp.NewServer(session.NewBackend(config.Username, config.Password, func(data *types.MailData, raw []byte) error {
+		if err := os.WriteFile("data/messages/"+data.Id, raw, 0644); err != nil {
+			log.Printf("write raw message %s: %v", data.Id, err)
+			return fmt.Errorf("persist raw message: %w", err)
+		}
+		if err := storage.SaveMessage(data); err != nil {
+			log.Printf("save message %s: %v", data.Id, err)
+			return fmt.Errorf("persist message record: %w", err)
+		}
+		log.Println("message saved", data.Id, data.MessageId)
 		return nil
 	}))
 
@@ -169,7 +173,7 @@ func main() {
 	go listenSmtp(s)
 
 	log.Println("Starting API server at", config.APIPort)
-	http.ListenAndServe(":"+config.APIPort, router)
+	log.Fatal(http.ListenAndServe(":"+config.APIPort, router))
 }
 
 func listenSmtp(s *smtp.Server) {

@@ -6,7 +6,8 @@ import (
 
 func (s *Storage) LoadMessage(id string) (*types.MailData, error) {
 	var message types.MailData
-	err := s.db.One("Id", id, &message)
-
-	return &message, err
+	if err := s.db.One("Id", id, &message); err != nil {
+		return nil, err
+	}
+	return &message, nil
 }

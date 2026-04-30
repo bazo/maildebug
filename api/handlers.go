@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"maildebug/types"
@@ -10,6 +11,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/asdine/storm"
 	"github.com/uptrace/bunrouter"
 )
 
@@ -83,12 +85,16 @@ func (api *Api) LoadMessagesAttachment(w http.ResponseWriter, r *http.Request) {
 
 	message, err := api.storage.LoadMessage(id)
 	if err != nil {
-		createErrorResponse(w, err, http.StatusBadRequest)
+		if errors.Is(err, storm.ErrNotFound) {
+			createErrorResponse(w, fmt.Errorf("message %s not found", id), http.StatusNotFound)
+			return
+		}
+		createErrorResponse(w, err, http.StatusInternalServerError)
 		return
 	}
 
-	if message == nil {
-		createErrorResponse(w, err, http.StatusNotFound)
+	if i < 0 || int(i) >= len(message.Attachments) {
+		createErrorResponse(w, fmt.Errorf("attachment index %d out of range (have %d)", i, len(message.Attachments)), http.StatusBadRequest)
 		return
 	}
 

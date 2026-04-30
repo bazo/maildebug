@@ -3,6 +3,7 @@ package session
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -13,11 +14,14 @@ import (
 	"mime/quotedprintable"
 	"net/mail"
 	"strings"
+	"time"
+
+	crand "crypto/rand"
 
 	"github.com/emersion/go-smtp"
 )
 
-type dataCallback func(*types.MailData, bytes.Buffer) error
+type dataCallback func(*types.MailData, []byte) error
 
 // The Backend implements SMTP server methods.
 type Backend struct {
@@ -69,79 +73,89 @@ func (s *session) Rcpt(to string, options *smtp.RcptOptions) error {
 }
 
 func (s *session) Data(r io.Reader) error {
-	var b bytes.Buffer
-	t := io.TeeReader(r, &b)
-
-	// data, err := io.ReadAll(t)
-	// log.Println(string(data))
-	// if err != nil {
-	// 	return err
-	// }
-
-	m, err := mail.ReadMessage(t)
+	raw, err := io.ReadAll(r)
 	if err != nil {
 		return err
 	}
 
-	contentType := m.Header.Get("Content-Type")
-	if contentType != "" {
-		mediaType, params, err := mime.ParseMediaType(contentType)
-		if err != nil {
-			log.Fatal(err)
-		}
+	s.data.Id = generateID()
 
-		if strings.HasPrefix(mediaType, "multipart/") {
-			partData, attachments, _ := parseParts(m.Body, params)
-			s.data.Parts = partData
-			s.data.Attachments = attachments
-		} else {
-			part, _ := parsePart(m.Body, m.Header)
-			s.data.Parts = []*types.PartData{
-				part,
-			}
-		}
+	m, parseErr := mail.ReadMessage(bytes.NewReader(raw))
+	if parseErr != nil {
+		log.Printf("mail.ReadMessage failed (saving raw bytes anyway): %v", parseErr)
+		s.data.Date = time.Now()
+		return s.onData(s.data, raw)
 	}
 
 	dec := new(mime.WordDecoder)
-	from, err := dec.DecodeHeader(m.Header.Get("From"))
 
+	fromHeader, err := dec.DecodeHeader(m.Header.Get("From"))
 	if err != nil {
-		return err
+		log.Printf("decode From header: %v", err)
+		fromHeader = m.Header.Get("From")
 	}
+	s.data.FromFormatted = fromHeader
 
 	subject, err := dec.DecodeHeader(m.Header.Get("Subject"))
-
 	if err != nil {
-		return err
+		log.Printf("decode Subject header: %v", err)
+		subject = m.Header.Get("Subject")
 	}
+	s.data.Subject = subject
 
 	date, err := m.Header.Date()
-
 	if err != nil {
-		return err
+		log.Printf("parse Date header: %v", err)
+		date = time.Now()
+	}
+	s.data.Date = date
+
+	s.data.MessageId = m.Header.Get("Message-Id")
+	s.data.RawHeaders = m.Header
+
+	contentType := m.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "text/plain; charset=us-ascii"
 	}
 
-	messageId := m.Header.Get("Message-Id")
+	mediaType, params, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		log.Printf("parse Content-Type %q (treating as text/plain): %v", contentType, err)
+		mediaType = "text/plain"
+		params = map[string]string{"charset": "us-ascii"}
+	}
 
-	parts := strings.Split(messageId, "@")
+	if strings.HasPrefix(mediaType, "multipart/") {
+		partData, attachments, _ := parseParts(m.Body, params)
+		s.data.Parts = partData
+		s.data.Attachments = attachments
+	} else {
+		part, err := parseSinglePart(m.Body, m.Header, mediaType, params)
+		if err != nil {
+			log.Printf("parse body: %v", err)
+		} else {
+			s.data.Parts = []*types.PartData{part}
+		}
+	}
 
-	id := parts[0][1:len(parts[0])]
-
-	s.data.Id = id
-	s.data.MessageId = messageId
-	s.data.Date = date
-	s.data.FromFormatted = from
-	s.data.Subject = subject
-	s.data.RawHeaders = m.Header
-	s.onData(s.data, b)
-
-	return nil
+	return s.onData(s.data, raw)
 }
 
-func (s *session) Reset() {}
+func (s *session) Reset() {
+	s.data = &types.MailData{}
+}
 
 func (s *session) Logout() error {
 	return nil
+}
+
+// generateID returns a filename-safe, sortable, collision-resistant ID.
+// Used as the storm primary key and as the on-disk filename for raw bytes,
+// so it must never come from untrusted header content.
+func generateID() string {
+	var rnd [4]byte
+	_, _ = crand.Read(rnd[:])
+	return fmt.Sprintf("%d-%s", time.Now().UnixNano(), hex.EncodeToString(rnd[:]))
 }
 
 func newPartData(data []byte, mediaType string, charset string) types.PartData {
@@ -162,8 +176,6 @@ func newAttachmentData(data []byte, mediaType string, attachmentName string) typ
 
 func parseParts(mimeData io.Reader, params map[string]string) ([]*types.PartData, []*types.Attachment, error) {
 	boundary := params["boundary"]
-	// Instantiate a new io.Reader dedicated to MIME multipart parsing
-	// using multipart.NewReader()
 	reader := multipart.NewReader(mimeData, boundary)
 	if reader == nil {
 		return nil, nil, nil
@@ -172,29 +184,25 @@ func parseParts(mimeData io.Reader, params map[string]string) ([]*types.PartData
 	parts := []*types.PartData{}
 	attachments := []*types.Attachment{}
 
-	// Go through each of the MIME part of the message Body with NextPart(),
 	for {
 		newPart, err := reader.NextPart()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			fmt.Println("Error going through the MIME parts -", err)
+			log.Println("Error going through the MIME parts -", err)
 			break
 		}
 
 		mediaType, params, err := mime.ParseMediaType(newPart.Header.Get("Content-Type"))
 
 		if err == nil && strings.HasPrefix(mediaType, "multipart/") {
-			// This is a new multipart to be handled recursively
 			p, a, err := parseParts(newPart, params)
 			if err == nil {
 				parts = append(parts, p...)
 				attachments = append(attachments, a...)
 			}
 		} else {
-			// Not a new nested multipart.
-			// We can do something here with the data of this single MIME part.
 			isAttachment, data, err := extractPartData(newPart, mediaType, params)
 			if err == nil && data != nil {
 				if isAttachment {
@@ -211,25 +219,17 @@ func parseParts(mimeData io.Reader, params map[string]string) ([]*types.PartData
 	return parts, attachments, nil
 }
 
-func parsePart(mimeData io.Reader, header mail.Header) (*types.PartData, error) {
-	mediaType, params, err := mime.ParseMediaType(header.Get("Content-Type"))
-
+// parseSinglePart reads a non-multipart body using already-parsed media type
+// and params, so the caller can synthesize defaults when Content-Type is missing.
+func parseSinglePart(body io.Reader, header mail.Header, mediaType string, params map[string]string) (*types.PartData, error) {
+	partBytes, err := io.ReadAll(body)
 	if err != nil {
 		return nil, err
 	}
-
-	partBytes, err := io.ReadAll(mimeData)
+	data, err := decodePart(partBytes, header.Get("Content-Transfer-Encoding"))
 	if err != nil {
 		return nil, err
 	}
-	contentTransferEncoding := header.Get("Content-Transfer-Encoding")
-
-	data, err := decodePart(partBytes, contentTransferEncoding)
-
-	if err != nil {
-		return nil, err
-	}
-
 	part := newPartData(data, mediaType, params["charset"])
 	return &part, nil
 }
