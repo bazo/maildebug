@@ -1,0 +1,223 @@
+{
+	"project": {
+		"name": "maildebug",
+		"description": "Self-contained SMTP debugging server. Single Go binary runs SMTP capture (:1025) + HTTP API (:8100) serving an embedded React UI for browsing captured mail.",
+		"language": ["go", "typescript"],
+		"go_module": "maildebug",
+		"go_version": "1.25.0",
+		"generated": "2026-04-30"
+	},
+	"entry_points": {
+		"binary": "main.go",
+		"smtp_default_port": 1025,
+		"http_default_port": 8100,
+		"ui_dev_port": 5173,
+		"task_runner": "Taskfile.yml"
+	},
+	"directories": {
+		"api": {
+			"path": "api/",
+			"purpose": "HTTP handlers using bunrouter",
+			"files": ["api.go", "handlers.go"]
+		},
+		"session": {
+			"path": "session/",
+			"purpose": "SMTP backend + MIME parsing (emersion/go-smtp)",
+			"files": ["session.go"]
+		},
+		"storage": {
+			"path": "storage/",
+			"purpose": "Persistence via storm ORM over bbolt",
+			"files": [
+				"storage.go",
+				"saveMessage.go",
+				"loadMessages.go",
+				"loadMessageAttachment.go",
+				"deleteMessages.go"
+			]
+		},
+		"types": {
+			"path": "types/",
+			"purpose": "Shared Go structs",
+			"files": ["types.go"]
+		},
+		"ui": {
+			"path": "ui/",
+			"purpose": "Vite + React 19 + Tailwind v4 frontend; built into ui/dist and embedded in Go binary",
+			"src": ["main.tsx", "app.tsx", "message-preview.tsx", "types.ts", "helpers.ts"]
+		},
+		"email-test": {
+			"path": "email-test/",
+			"purpose": "Bun + react-email + nodemailer harness for sending sample mail to local SMTP",
+			"files": [
+				"send.tsx",
+				"emails/notion-magic-link.tsx",
+				"emails/plaid-verify-identity.tsx",
+				"emails/stripe-welcome.tsx",
+				"emails/vercel-invite-user.tsx"
+			]
+		},
+		"data": {
+			"path": "data/",
+			"purpose": "Runtime: bbolt DB file + raw RFC 822 message bytes (data/messages/<id>)"
+		}
+	},
+	"modules": {
+		"main": {
+			"file": "main.go",
+			"exports": ["loadConfig", "main", "listenSmtp"],
+			"notes": [
+				"Embeds ui/dist via //go:embed",
+				"Layered dotenv: maildebug.env.<env>.local -> ... -> .env (godotenv does not overwrite)",
+				"All env vars prefixed MAILDEBUG_",
+				"SMTP runs in goroutine; HTTP blocks main; no graceful shutdown"
+			]
+		},
+		"api": {
+			"files": ["api/api.go", "api/handlers.go"],
+			"types": ["Api"],
+			"constructors": ["NewApi(storage)"],
+			"handlers": {
+				"LoadMessagesHandler": "GET /messages?page=&maxPerPage= (default 50/page)",
+				"LoadMessagesAttachment": "GET /messages/:id/attachments/:index (base64 -> stream)",
+				"DeleteMessagesHandler": "DELETE /messages"
+			},
+			"helpers": ["createResponse", "createErrorResponse"],
+			"cors": "Access-Control-Allow-Origin: *"
+		},
+		"session": {
+			"file": "session/session.go",
+			"types": ["Backend", "session"],
+			"constructors": ["NewBackend(username, password, onData)"],
+			"key_functions": [
+				"AuthPlain",
+				"Mail",
+				"Rcpt",
+				"Data",
+				"parseParts",
+				"parsePart",
+				"extractPartData",
+				"decodePart"
+			],
+			"decoded_encodings": ["base64", "quoted-printable"],
+			"id_convention": "Stored Id = local-part of Message-Id header"
+		},
+		"storage": {
+			"files": ["storage/*.go"],
+			"types": ["Storage"],
+			"constructors": ["NewStorage()"],
+			"methods": {
+				"Init": "Init(dbName) - creates data/, opens data/<dbName>, registers MailData",
+				"Close": "Close()",
+				"SaveMessage": "SaveMessage(*MailData)",
+				"LoadMessages": "LoadMessages(page, limit) -> ([]*MailData, total, error); strips attachment Data",
+				"LoadMessage": "LoadMessage(id) -> *MailData",
+				"DeleteMessages": "DeleteMessages() - drops MailData bucket"
+			},
+			"engine": "asdine/storm over go.etcd.io/bbolt"
+		},
+		"types": {
+			"file": "types/types.go",
+			"types": {
+				"Config": "All server config (ports, creds, timeouts, SMTP limits)",
+				"MailData": "Storm model. Id storm:id, Date storm:index. Includes Parts, Attachments, RawHeaders",
+				"PartData": "MediaType, Data, Charset",
+				"Attachment": "MediaType, Data (base64), Name",
+				"ApiResponse": "Page, PagesCount, Messages"
+			}
+		},
+		"ui": {
+			"framework": "React 19 + Vite 8 + Tailwind 4",
+			"alias": { "@": "ui/src" },
+			"files": {
+				"main.tsx": "Bootstraps React + TanStack Query",
+				"app.tsx": "Layout, message list, pagination",
+				"message-preview.tsx": "Renders selected message via react-letter",
+				"types.ts": "TS mirror of Go MailData",
+				"helpers.ts": "classNames, formatDate (locale via VITE_LOCALE, default sk-SK)"
+			}
+		}
+	},
+	"http_routes": [
+		{ "method": "GET", "path": "/", "handler": "embedded UI index.html" },
+		{ "method": "GET", "path": "/assets/*path", "handler": "embedded UI assets" },
+		{ "method": "GET", "path": "/messages", "handler": "api.LoadMessagesHandler" },
+		{
+			"method": "GET",
+			"path": "/messages/:id/attachments/:index",
+			"handler": "api.LoadMessagesAttachment"
+		},
+		{ "method": "DELETE", "path": "/messages", "handler": "api.DeleteMessagesHandler" },
+		{ "method": "OPTIONS", "path": "/*p", "handler": "CORS preflight 200" },
+		{
+			"method": "GET",
+			"path": "/.well-known/appspecific/com.chrome.devtools.json",
+			"handler": "204"
+		}
+	],
+	"config_files": {
+		"Taskfile.yml": "Task runner (dotenv: maildebug.env, .env)",
+		"maildebug.env.example": "Template for runtime env vars",
+		".air.toml": "Go hot reload (excludes tmp, ui, node_modules, .github, .vscode, email-test)",
+		"lefthook.yml": "pre-commit (oxfmt, oxlint, tsc, gofmt, go vet, go build); pre-push (tsc, go build)",
+		".oxfmtrc.json": "JS/TS formatter config",
+		".oxlintrc.json": "JS/TS linter config",
+		"package.json": "Root Bun workspaces (ui only); installs lefthook postinstall",
+		"ui/vite.config.ts": "Plugins: tailwindcss, react, devtoolsJson",
+		"Dockerfile": "Multi-stage: bun (UI) -> golang (binary, upx) -> scratch"
+	},
+	"tasks": {
+		"server": "task server (air hot reload)",
+		"client": "task client (Vite dev server)",
+		"client:build": "task client:build (required before go build)",
+		"format": "task format (oxfmt)",
+		"test": "task test -- <recipient> (sends sample email)",
+		"docker:build": "task docker:build (local arch)",
+		"docker:push": "task docker:push (multi-arch buildx)",
+		"docker:buildx": "task docker:buildx (ensure builder)"
+	},
+	"dependencies": {
+		"go": {
+			"github.com/emersion/go-smtp": "v0.24.0",
+			"github.com/asdine/storm": "v2.1.2",
+			"go.etcd.io/bbolt": "v1.4.3",
+			"github.com/uptrace/bunrouter": "v1.0.23",
+			"github.com/joho/godotenv": "v1.5.1"
+		},
+		"ui": {
+			"react": "^19.2.5",
+			"@tanstack/react-query": "^5.100.6",
+			"tailwindcss": "^4.2.4",
+			"react-letter": "^0.4.0",
+			"react-headless-pagination": "^1.1.6",
+			"@headlessui/react": "^2.2.10",
+			"@heroicons/react": "^2.2.0",
+			"vite": "^8.0.10",
+			"typescript": "^6.0.3"
+		},
+		"tooling": {
+			"oxlint": "1.62.0",
+			"oxfmt": "0.47.0",
+			"lefthook": "^2.1.6"
+		},
+		"email-test": {
+			"react-email": "6.0.5",
+			"nodemailer": "^8.0.7",
+			"zod": "^4.4.1"
+		}
+	},
+	"tests": {
+		"unit": 0,
+		"integration": 0,
+		"notes": "No automated test suites. email-test/ is a manual dev harness. Verification via lefthook hooks (build + vet + tsc)."
+	},
+	"conventions": [
+		"Go module path is bare 'maildebug'; internal imports use maildebug/<pkg>",
+		"ui/dist must exist before go build (//go:embed)",
+		"godotenv does not overwrite existing vars; file order = priority",
+		"No graceful shutdown",
+		"No SPA fallback; new UI routes need explicit Go handlers",
+		"Permissive CORS (*) on all API responses",
+		"Final Docker image FROM scratch (no shell, no certs)"
+	]
+}
