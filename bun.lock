@@ -25,6 +25,7 @@
         "@types/react-dom": "^19.2.3",
         "autoprefixer": "^10.5.0",
         "dotenv-cli": "^11.0.0",
+        "lettersanitizer": "^1.0.2",
         "react": "^19.2.5",
         "react-dom": "^19.2.5",
         "react-headless-pagination": "^1.1.6",

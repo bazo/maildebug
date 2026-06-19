@@ -5,7 +5,8 @@
 	"scripts": {
 		"build": "email build",
 		"dev": "email dev",
-		"export": "email export"
+		"export": "email export",
+		"test": "bun test"
 	},
 	"dependencies": {
 		"@types/nodemailer": "^8.0.0",

@@ -28,6 +28,12 @@ tasks:
         cmds:
             - bun run send.tsx --email {{.CLI_ARGS}}
 
+    test:e2e:
+        desc: Integration tests — spawn maildebug, send real emails, assert capture
+        dir: email-test
+        cmds:
+            - bun test
+
     docker:buildx:
         desc: Ensure a multi-platform buildx builder is available
         cmds:

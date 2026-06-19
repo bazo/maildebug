@@ -1,14 +1,25 @@
-import { PaperClipIcon } from "@heroicons/react/20/solid";
+import {
+	ComputerDesktopIcon,
+	DevicePhoneMobileIcon,
+	DeviceTabletIcon,
+	PaperClipIcon,
+} from "@heroicons/react/20/solid";
 import { useState } from "react";
-import { Letter } from "react-letter";
 
 import type { Message } from "@/types";
 
+import EmailViewport from "./email-viewport";
 import { classNames, formatDate } from "./helpers";
 
 interface MessagePreviewProps {
 	message: Message;
 }
+
+const VIEWPORTS = [
+	{ label: "Desktop", icon: ComputerDesktopIcon, width: null },
+	{ label: "Tablet", icon: DeviceTabletIcon, width: 768 },
+	{ label: "Mobile", icon: DevicePhoneMobileIcon, width: 375 },
+] as const;
 
 export default function MessagePreview({ message }: MessagePreviewProps) {
 	const html = message.parts.find((part) => {
@@ -20,6 +31,9 @@ export default function MessagePreview({ message }: MessagePreviewProps) {
 	});
 
 	const [tab, setTab] = useState(html ? "text/html" : "text/plain");
+	// Email preview width in px, or null for full-width responsive (Desktop).
+	const [viewport, setViewport] = useState<number | null>(null);
+	const [customWidth, setCustomWidth] = useState("");
 
 	return (
 		<>
@@ -61,7 +75,6 @@ export default function MessagePreview({ message }: MessagePreviewProps) {
 										className="divide-y divide-gray-200 rounded-md border border-gray-200"
 									>
 										{message.attachments.map((attachment, key) => {
-											console.log({ attachment });
 											return (
 												<li
 													className="flex items-center justify-between py-3 pl-3 pr-4 text-sm"
@@ -135,10 +148,62 @@ export default function MessagePreview({ message }: MessagePreviewProps) {
 						>
 							headers
 						</div>
+
+						{tab === "text/html" && html && (
+							<div className="ml-auto flex items-center gap-1 pr-3">
+								{VIEWPORTS.map((v) => {
+									const active = viewport === v.width && customWidth === "";
+									return (
+										<button
+											type="button"
+											key={v.label}
+											title={v.label}
+											aria-label={v.label}
+											aria-pressed={active}
+											onClick={() => {
+												setViewport(v.width);
+												setCustomWidth("");
+											}}
+											className={classNames(
+												active
+													? "bg-gray-100 text-gray-700"
+													: "text-gray-500 hover:text-gray-700",
+												"rounded-md p-2 cursor-pointer",
+											)}
+										>
+											<v.icon className="h-5 w-5" aria-hidden="true" />
+										</button>
+									);
+								})}
+								<input
+									type="number"
+									min={200}
+									max={2000}
+									placeholder="px"
+									value={customWidth}
+									onChange={(e) => {
+										const raw = e.target.value;
+										setCustomWidth(raw);
+										const n = parseInt(raw, 10);
+										if (!Number.isNaN(n)) setViewport(n);
+									}}
+									className="w-20 rounded-md border border-gray-300 px-2 py-1 text-sm"
+								/>
+							</div>
+						)}
 					</nav>
 				</div>
 				<div className="pl-6 py-2">
-					{tab === "text/html" && <Letter html={html?.data || ""} />}
+					{tab === "text/html" &&
+						(html ? (
+							<EmailViewport
+								html={html.data}
+								width={viewport}
+								title={message.subject}
+							/>
+						) : (
+							<p className="text-sm text-gray-500">No HTML part in this message.</p>
+						))}
 
 					{tab === "text/plain" && (
 						<div style={{ whiteSpace: "pre-line" }}>{plainText?.data}</div>
