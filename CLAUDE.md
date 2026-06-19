@@ -43,16 +43,17 @@ Top-level `main.go` wires everything together:
    - `DELETE /messages` — wipe.
    - All responses go through `createResponse`/`createErrorResponse` which set permissive CORS (`*`).
    - `OPTIONS /*p` returns `200` with `Access-Control-Allow-*: *` for CORS preflight.
-5. **Static UI** — `embed.FS` over `ui/dist`. The router serves `/` and `/assets/*` from the embedded FS. There is no SPA fallback; new top-level UI routes need explicit handlers.
-6. **Lifecycle** — SMTP runs in a goroutine (`listenSmtp`), HTTP runs on the main goroutine. There's no graceful shutdown; both are blocking calls.
+5. **MCP server** (`mcpserver/`) — a Model Context Protocol server (official `github.com/modelcontextprotocol/go-sdk`) so LLMs/agents can verify captured email. Built once via `mcpserver.New(storage)` and mounted on the same HTTP server over **Streamable HTTP** at `/mcp` (GET/POST/DELETE all routed to one `mcp.NewStreamableHTTPHandler`). Tools: `list_emails`, `read_email` (decoded html/text + headers), `search_emails` (case-insensitive substring AND over to/from/subject/body), `wait_for_email` (polls until a match or timeout — for async flows), `clear_emails`. Tool I/O is typed structs with `jsonschema` tags; handlers call straight into `storage`. Connect with `claude mcp add maildebug --transport http http://localhost:8100/mcp`.
+6. **Static UI** — `embed.FS` over `ui/dist`. The router serves `/` and `/assets/*` from the embedded FS. There is no SPA fallback; new top-level UI routes need explicit handlers.
+7. **Lifecycle** — SMTP runs in a goroutine (`listenSmtp`), HTTP runs on the main goroutine. There's no graceful shutdown; both are blocking calls.
 
 ### UI
 
-`ui/` is a Vite + React 19 + TanStack Query + Tailwind v4 app. The `@/` alias points to `ui/src`. `react-letter` renders message HTML, `react-headless-pagination` drives the paginator. Components are flat under `ui/src/` (`app.tsx`, `message-preview.tsx`, etc.). When developing, run the Go server on `:8100` and Vite on `:5173` — the UI calls the Go API directly with permissive CORS.
+`ui/` is a Vite + React 19 + TanStack Query + Tailwind v4 app. The `@/` alias points to `ui/src`. `react-headless-pagination` drives the paginator. HTML message bodies render via `email-viewport.tsx`, which sanitizes with `lettersanitizer` (the engine `react-letter` wraps) and writes the result into a width-controlled sandboxed `<iframe>` so the email's own `@media` breakpoints fire — the preview pane has Desktop/Tablet/Mobile + custom-width controls (Mailtrap-style). Components are flat under `ui/src/` (`app.tsx`, `message-preview.tsx`, etc.). When developing, run the Go server on `:8100` and Vite on `:5173` — the UI calls the Go API directly with permissive CORS.
 
 ### email-test harness
 
-`email-test/` is an isolated Bun workspace (not part of the root workspaces) using `react-email` templates. `send.tsx` renders a template (`notion`/`plaid`/`stripe`/`vercel`) and sends it to the local SMTP via `nodemailer`. Connection settings come from env vars validated by zod; defaults match `maildebug.env.example`.
+`email-test/` is an isolated Bun workspace (not part of the root workspaces) using `react-email` templates. `templates.tsx` is the shared module (`emailData` map, `renderTemplate`, `sendEmail`, `smtpConfigFromEnv`); `send.tsx` is the CLI that renders a template (`notion`/`plaid`/`stripe`/`vercel`/`responsive`) and sends it to the local SMTP via `nodemailer`. Connection settings come from `MAILDEBUG_*` env vars validated by zod; defaults match `maildebug.env.example`. `send.test.tsx` is a `bun test` integration suite (`task test:e2e`) that builds + spawns the real binary on isolated ports in a temp dir, sends every template, and asserts capture via the API — including that the `responsive` fixture's `@media` rules survive end-to-end.
 
 ## Conventions worth knowing
 

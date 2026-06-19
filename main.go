@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"log"
 	"maildebug/api"
+	"maildebug/mcpserver"
 	"maildebug/session"
 	"maildebug/storage"
 	"maildebug/types"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/emersion/go-smtp"
 	"github.com/joho/godotenv"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/uptrace/bunrouter"
 	"github.com/uptrace/bunrouter/extra/reqlog"
 )
@@ -169,6 +171,16 @@ func main() {
 	router.GET("/messages", api.LoadMessagesHandler)
 	router.GET("/messages/:id/attachments/:index", api.LoadMessagesAttachment)
 	router.DELETE("/messages", api.DeleteMessagesHandler)
+
+	// MCP server (Streamable HTTP) so LLMs/agents can verify captured emails.
+	mcpServer := mcpserver.New(storage)
+	mcpHandler := mcp.NewStreamableHTTPHandler(
+		func(_ *http.Request) *mcp.Server { return mcpServer },
+		nil,
+	)
+	router.GET("/mcp", mcpHandler.ServeHTTP)
+	router.POST("/mcp", mcpHandler.ServeHTTP)
+	router.DELETE("/mcp", mcpHandler.ServeHTTP)
 
 	go listenSmtp(s)
 

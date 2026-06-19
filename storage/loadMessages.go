@@ -17,8 +17,12 @@ func (s *Storage) LoadMessages(page int64, limit int64) ([]*types.MailData, int6
 			return nil
 		}
 
+		// Count only real records. storm keeps its indexes as nested buckets
+		// inside this bucket; those iterate with a nil value and must be skipped.
 		b.ForEach(func(k, v []byte) error {
-			total++
+			if v != nil {
+				total++
+			}
 			return nil
 		})
 

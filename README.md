@@ -169,6 +169,27 @@ Point your app at `smtp://username:password@maildebug:1025` and browse `http://l
 | `GET`    | `/messages?page=N&maxPerPage=M`            | Paginated list (default 50/page)         |
 | `GET`    | `/messages/:id/attachments/:index`         | Stream attachment with original filename |
 | `DELETE` | `/messages`                                | Wipe everything                          |
+| `*`      | `/mcp`                                      | MCP server (Streamable HTTP) — see below |
+
+## MCP — let an LLM verify captured email
+
+maildebug exposes a [Model Context Protocol](https://modelcontextprotocol.io) server over HTTP at `/mcp`, so an AI agent can assert against the mail your app actually sent — e.g. "register a user, then confirm the welcome email arrived at the right address with the right link."
+
+Connect it to Claude Code:
+
+```bash
+claude mcp add maildebug --transport http http://localhost:8100/mcp
+```
+
+Tools:
+
+| Tool             | Purpose                                                                    |
+| ---------------- | -------------------------------------------------------------------------- |
+| `list_emails`    | List captured emails (newest first) with subject/from/to/date             |
+| `read_email`     | Full content of one email by id: decoded HTML, plain text, headers         |
+| `search_emails`  | Find emails by recipient / sender / subject / body (substring, all match)  |
+| `wait_for_email` | Poll until a matching email is captured, or time out (for async flows)     |
+| `clear_emails`   | Delete all captured emails to start a verification run clean               |
 
 ## Stack
 
