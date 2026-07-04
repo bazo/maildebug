@@ -43,7 +43,7 @@ func (s *Storage) LoadMessages(page int64, limit int64) ([]*types.MailData, int6
 		message := record.(*types.MailData)
 
 		for _, att := range message.Attachments {
-			att.Data = ""
+			att.Data = nil
 		}
 
 		messages = append(messages, message)

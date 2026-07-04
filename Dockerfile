@@ -27,9 +27,10 @@ WORKDIR ${DEST}
 COPY --from=bun-builder /tmp/ui/dist ui/dist
 
 COPY api api
-COPY session session 
+COPY session session
 COPY storage storage
 COPY types types
+COPY mcpserver mcpserver
 COPY main.go go.mod go.sum ./
 
 RUN pwd

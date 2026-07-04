@@ -2,12 +2,12 @@ package api
 
 import (
 	"bytes"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 	"maildebug/types"
 	"math"
+	"mime"
 	"net/http"
 	"strconv"
 
@@ -100,17 +100,15 @@ func (api *Api) LoadMessagesAttachment(w http.ResponseWriter, r *http.Request) {
 
 	attachment := message.Attachments[i]
 
-	//createResponse(w, attachment, http.StatusOK)
-
-	b, err := base64.StdEncoding.DecodeString(attachment.Data)
-	if err != nil {
-		createErrorResponse(w, err, http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Disposition", "attachment; filename="+attachment.Name)
+	// attachment.Data already holds the decoded bytes (session.decodePart
+	// decodes base64/quoted-printable at ingest time), so serve it as-is —
+	// decoding again here corrupts binary content and 500s on non-base64 bytes.
+	//
+	// FormatMediaType quotes/encodes the filename so names with spaces or
+	// special characters aren't mangled by browsers.
+	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": attachment.Name}))
 	w.Header().Set("Content-Type", attachment.MediaType)
-	io.Copy(w, bytes.NewReader(b))
+	io.Copy(w, bytes.NewReader(attachment.Data))
 }
 
 func (api *Api) DeleteMessagesHandler(w http.ResponseWriter, r *http.Request) {

@@ -24,7 +24,9 @@ export default function EmailViewport({ html, text, width, title }: EmailViewpor
 			preserveCssPriority: true,
 			noWrapper: true,
 		});
-		return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${RESET}</style></head><body>${body}</body></html>`;
+		// <base target="_blank"> makes every link open in a new tab; the
+		// sandbox below grants allow-popups so the navigation isn't blocked.
+		return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base target="_blank"><style>${RESET}</style></head><body>${body}</body></html>`;
 	}, [html, text]);
 
 	// Auto-size the iframe to its content and keep it in sync as the email
@@ -61,24 +63,37 @@ export default function EmailViewport({ html, text, width, title }: EmailViewpor
 	}, [srcDoc, width]);
 
 	return (
-		<div className="flex justify-center overflow-x-auto bg-gray-100 p-4">
-			<iframe
-				ref={iframeRef}
-				title={title || "Email preview"}
-				srcDoc={srcDoc}
-				// No allow-scripts: untrusted email must never execute JS.
-				// allow-same-origin is required to read contentDocument for
-				// auto-height; the sanitizer is the primary defense.
-				sandbox="allow-same-origin"
-				referrerPolicy="no-referrer"
-				className="border border-gray-200 bg-white shadow-sm"
+		<div className="flex justify-center overflow-x-auto bg-[#eef0f3] p-7">
+			<div
+				className="overflow-hidden rounded-[12px] bg-white"
 				style={{
 					width: width == null ? "100%" : `${width}px`,
+					maxWidth: "100%",
 					flex: width == null ? "1 1 auto" : "0 0 auto",
-					height: `${height}px`,
-					border: "none",
+					transition: "width .25s ease",
+					boxShadow: "0 1px 3px rgba(16,24,40,.08), 0 8px 24px rgba(16,24,40,.06)",
 				}}
-			/>
+			>
+				<iframe
+					ref={iframeRef}
+					title={title || "Email preview"}
+					srcDoc={srcDoc}
+					// No allow-scripts: untrusted email must never execute JS.
+					// allow-same-origin is required to read contentDocument for
+					// auto-height; the sanitizer is the primary defense.
+					// allow-popups lets <base target="_blank"> links open a new
+					// tab; allow-popups-to-escape-sandbox so the opened page is
+					// not itself sandboxed.
+					sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+					referrerPolicy="no-referrer"
+					style={{
+						display: "block",
+						width: "100%",
+						height: `${height}px`,
+						border: "none",
+					}}
+				/>
+			</div>
 		</div>
 	);
 }

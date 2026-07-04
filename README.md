@@ -86,18 +86,18 @@ SMTP runs in a goroutine; HTTP runs on the main goroutine. Both are blocking —
 
 All vars are prefixed `MAILDEBUG_`. Defaults live in `maildebug.env.example`.
 
-| Var                    | Default      | Purpose                                |
-| ---------------------- | ------------ | -------------------------------------- |
-| `SMTP_PORT`            | `1025`       | SMTP listen port                       |
-| `API_PORT`             | `8100`       | HTTP API + UI listen port              |
-| `USERNAME` / `PASSWORD`| –            | AuthPlain credentials                  |
-| `DB_NAME`              | `mail.bolt`  | bbolt file under `data/`               |
-| `DOMAIN`               | `localhost`  | SMTP greeting domain                   |
-| `READ_TIMEOUT`         | `10`         | seconds                                |
-| `WRITE_TIMEOUT`        | `10`         | seconds                                |
-| `MAX_MESSAGE_BYTES`    | `1048576`    | hard cap per message                   |
-| `MAX_RECIPIENTS`       | `50`         | per envelope                           |
-| `ALLOW_INSECURE_AUTH`  | `true`       | required for plaintext local auth      |
+| Var                     | Default     | Purpose                           |
+| ----------------------- | ----------- | --------------------------------- |
+| `SMTP_PORT`             | `1025`      | SMTP listen port                  |
+| `API_PORT`              | `8100`      | HTTP API + UI listen port         |
+| `USERNAME` / `PASSWORD` | –           | AuthPlain credentials             |
+| `DB_NAME`               | `mail.bolt` | bbolt file under `data/`          |
+| `DOMAIN`                | `localhost` | SMTP greeting domain              |
+| `READ_TIMEOUT`          | `10`        | seconds                           |
+| `WRITE_TIMEOUT`         | `10`        | seconds                           |
+| `MAX_MESSAGE_BYTES`     | `1048576`   | hard cap per message              |
+| `MAX_RECIPIENTS`        | `50`        | per envelope                      |
+| `ALLOW_INSECURE_AUTH`   | `true`      | required for plaintext local auth |
 
 ## Running locally
 
@@ -147,29 +147,29 @@ In a `docker-compose.yml`:
 
 ```yaml
 services:
-  maildebug:
-    image: bazo/maildebug:latest
-    ports:
-      - "1025:1025"   # SMTP
-      - "8100:8100"   # UI + API
-    environment:
-      MAILDEBUG_USERNAME: username
-      MAILDEBUG_PASSWORD: password
-      MAILDEBUG_ALLOW_INSECURE_AUTH: "true"
-    volumes:
-      - ./data:/data
+    maildebug:
+        image: bazo/maildebug:latest
+        ports:
+            - "1025:1025" # SMTP
+            - "8100:8100" # UI + API
+        environment:
+            MAILDEBUG_USERNAME: username
+            MAILDEBUG_PASSWORD: password
+            MAILDEBUG_ALLOW_INSECURE_AUTH: "true"
+        volumes:
+            - ./data:/data
 ```
 
 Point your app at `smtp://username:password@maildebug:1025` and browse `http://localhost:8100`.
 
 ## API
 
-| Method   | Path                                       | Purpose                                  |
-| -------- | ------------------------------------------ | ---------------------------------------- |
-| `GET`    | `/messages?page=N&maxPerPage=M`            | Paginated list (default 50/page)         |
-| `GET`    | `/messages/:id/attachments/:index`         | Stream attachment with original filename |
-| `DELETE` | `/messages`                                | Wipe everything                          |
-| `*`      | `/mcp`                                      | MCP server (Streamable HTTP) — see below |
+| Method   | Path                               | Purpose                                  |
+| -------- | ---------------------------------- | ---------------------------------------- |
+| `GET`    | `/messages?page=N&maxPerPage=M`    | Paginated list (default 50/page)         |
+| `GET`    | `/messages/:id/attachments/:index` | Stream attachment with original filename |
+| `DELETE` | `/messages`                        | Wipe everything                          |
+| `*`      | `/mcp`                             | MCP server (Streamable HTTP) — see below |
 
 ## MCP — let an LLM verify captured email
 
@@ -183,13 +183,13 @@ claude mcp add maildebug --transport http http://localhost:8100/mcp
 
 Tools:
 
-| Tool             | Purpose                                                                    |
-| ---------------- | -------------------------------------------------------------------------- |
+| Tool             | Purpose                                                                   |
+| ---------------- | ------------------------------------------------------------------------- |
 | `list_emails`    | List captured emails (newest first) with subject/from/to/date             |
-| `read_email`     | Full content of one email by id: decoded HTML, plain text, headers         |
-| `search_emails`  | Find emails by recipient / sender / subject / body (substring, all match)  |
-| `wait_for_email` | Poll until a matching email is captured, or time out (for async flows)     |
-| `clear_emails`   | Delete all captured emails to start a verification run clean               |
+| `read_email`     | Full content of one email by id: decoded HTML, plain text, headers        |
+| `search_emails`  | Find emails by recipient / sender / subject / body (substring, all match) |
+| `wait_for_email` | Poll until a matching email is captured, or time out (for async flows)    |
+| `clear_emails`   | Delete all captured emails to start a verification run clean              |
 
 ## Stack
 

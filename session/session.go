@@ -168,7 +168,7 @@ func newPartData(data []byte, mediaType string, charset string) types.PartData {
 
 func newAttachmentData(data []byte, mediaType string, attachmentName string) types.Attachment {
 	return types.Attachment{
-		Data:      string(data),
+		Data:      data,
 		MediaType: mediaType,
 		Name:      attachmentName,
 	}

@@ -1,10 +1,20 @@
+# build output
 tmp
-*.bolt
-node_modules
 dist
+maildebug
 
+# dependencies
+node_modules
+
+# runtime data (captured mail + bolt db) and local backups
+/data/
+data.backup-*/
+*.bolt
+
+# logs
 *.log
+
+# config / secrets
 maildebug.yml
 *.env
 .env
-maildebug

@@ -34,18 +34,21 @@ maildebug/
 ## 📦 Core Modules
 
 ### main (`main.go`)
+
 - `loadConfig()` — layered dotenv (`maildebug.env.<env>.local` → … → `.env`); env vars prefixed `MAILDEBUG_`.
 - `main()` — opens Storage, builds SMTP server with session.Backend, mounts bunrouter, embeds `ui/dist`, runs SMTP in goroutine.
 - `listenSmtp(s)` — blocking SMTP listener.
 
 ### api (`api/`)
+
 - `api.go`: `Api` struct, `NewApi(storage)`, `createResponse`, `createErrorResponse` (sets CORS `*`).
 - `handlers.go`:
-  - `LoadMessagesHandler` — `GET /messages?page=&maxPerPage=` (default 50/page, computes pagesCount).
-  - `LoadMessagesAttachment` — `GET /messages/:id/attachments/:index` (base64 → stream with original filename/media type).
-  - `DeleteMessagesHandler` — `DELETE /messages` (drops Storm bucket).
+    - `LoadMessagesHandler` — `GET /messages?page=&maxPerPage=` (default 50/page, computes pagesCount).
+    - `LoadMessagesAttachment` — `GET /messages/:id/attachments/:index` (base64 → stream with original filename/media type).
+    - `DeleteMessagesHandler` — `DELETE /messages` (drops Storm bucket).
 
 ### session (`session/session.go`)
+
 - `Backend` (implements `smtp.Backend`) — auth via `AuthPlain` against configured user/pass.
 - `session.Data(r)` — parses RFC 822 message; decodes RFC 2047 headers via `mime.WordDecoder`.
 - `parseParts` — recursive multipart walker; splits `PartData` vs `Attachment` by `Content-Disposition`.
@@ -54,6 +57,7 @@ maildebug/
 - ID convention: stored `id` = local-part of `Message-Id` header.
 
 ### storage (`storage/`)
+
 - `storage.go`: `Storage` wraps `storm.DB` over `bbolt`. `Init(dbName)` creates `data/`, opens `data/<dbName>`, registers `MailData`.
 - `saveMessage.go`: `SaveMessage(*MailData)` — normalizes nil attachments.
 - `loadMessages.go`: `LoadMessages(page, limit)` — counts via bolt, paginates via Storm `Select().Reverse().OrderBy("Date")`, strips attachment `Data` for list response.
@@ -61,11 +65,13 @@ maildebug/
 - `deleteMessages.go`: `DeleteMessages()` — `db.Drop(&MailData{})`.
 
 ### types (`types/types.go`)
+
 - `Config` — all server config (ports, creds, timeouts, SMTP limits).
 - `MailData` (Storm model) — `Id` (storm:"id"), `Date` (storm:"index"), Parts, Attachments, RawHeaders.
 - `PartData`, `Attachment`, `ApiResponse`.
 
 ### ui (`ui/src/`)
+
 - `main.tsx` — bootstraps React 19 + TanStack Query.
 - `app.tsx` — top-level layout, message list, pagination (`react-headless-pagination`).
 - `message-preview.tsx` — renders selected message via `react-letter`.
@@ -73,6 +79,7 @@ maildebug/
 - `helpers.ts` — `classNames`, `formatDate` (locale via `VITE_LOCALE`, default `sk-SK`).
 
 ### email-test (`email-test/`)
+
 - Isolated Bun workspace (not in root workspaces). Uses `react-email` + `nodemailer`.
 - `send.tsx` — `--email <to> [--template notion|plaid|stripe|vercel]`, env validated via zod.
 - `emails/*.tsx` — react-email templates.
@@ -103,6 +110,7 @@ maildebug/
 ## 🔗 Key Dependencies
 
 ### Go (`go.mod`)
+
 - `github.com/emersion/go-smtp` v0.24.0 — SMTP server framework.
 - `github.com/asdine/storm` v2.1.2 — ORM over bbolt.
 - `go.etcd.io/bbolt` v1.4.3 — embedded KV store.
@@ -110,6 +118,7 @@ maildebug/
 - `github.com/joho/godotenv` v1.5.1 — dotenv layered loading.
 
 ### UI (`ui/package.json`)
+
 - `react` 19, `react-dom` 19.
 - `@tanstack/react-query` 5 — server state.
 - `tailwindcss` 4 + `@tailwindcss/vite`.
@@ -119,10 +128,12 @@ maildebug/
 - `vite` 8, `typescript` 6.
 
 ### Tooling (root `package.json`)
+
 - `oxlint` 1.62, `oxfmt` 0.47 — JS/TS lint+format.
 - `lefthook` 2.1 — git hooks.
 
 ### email-test
+
 - `react-email` 6, `nodemailer` 8, `zod` 4, `bun-types`.
 
 ## 📝 Quick Start
@@ -136,21 +147,21 @@ maildebug/
 
 ## 🔌 API Surface (HTTP)
 
-| Method | Path                                     | Returns                                |
-|--------|------------------------------------------|----------------------------------------|
-| GET    | `/`                                      | Embedded UI `index.html`               |
-| GET    | `/assets/*path`                          | Embedded UI assets                     |
-| GET    | `/messages?page=&maxPerPage=`            | `ApiResponse{page, pagesCount, messages}` (attachments without `data`) |
-| GET    | `/messages/:id/attachments/:index`       | Raw attachment stream (Content-Disposition: attachment) |
-| DELETE | `/messages`                              | `ApiResponse{}` (drops all)            |
-| OPTIONS| `/*`                                     | 200 + CORS `*` (preflight)             |
-| GET    | `/.well-known/appspecific/com.chrome.devtools.json` | 204 (silenced)              |
+| Method  | Path                                                | Returns                                                                |
+| ------- | --------------------------------------------------- | ---------------------------------------------------------------------- |
+| GET     | `/`                                                 | Embedded UI `index.html`                                               |
+| GET     | `/assets/*path`                                     | Embedded UI assets                                                     |
+| GET     | `/messages?page=&maxPerPage=`                       | `ApiResponse{page, pagesCount, messages}` (attachments without `data`) |
+| GET     | `/messages/:id/attachments/:index`                  | Raw attachment stream (Content-Disposition: attachment)                |
+| DELETE  | `/messages`                                         | `ApiResponse{}` (drops all)                                            |
+| OPTIONS | `/*`                                                | 200 + CORS `*` (preflight)                                             |
+| GET     | `/.well-known/appspecific/com.chrome.devtools.json` | 204 (silenced)                                                         |
 
 ## ⚙️ Conventions / Gotchas
 
 - Go module path is bare `maildebug` — internal imports are `maildebug/<pkg>`.
 - `ui/dist` must exist before `go build` (embed). lefthook's `gobuild` hook will catch missing builds.
-- godotenv does *not* overwrite existing env vars; `loadConfig`'s file order encodes priority.
+- godotenv does _not_ overwrite existing env vars; `loadConfig`'s file order encodes priority.
 - No graceful shutdown; both SMTP and HTTP block to exit.
 - No SPA fallback in router — new top-level UI routes need explicit handlers in `main.go`.
 - All API responses set `Access-Control-Allow-Origin: *` (intended for local dev).

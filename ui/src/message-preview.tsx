@@ -1,239 +1,325 @@
+import { useMemo, useState } from "react";
+
+import EmailViewport from "@/email-viewport";
+import { categoryColors, classNames, deriveCategory, formatDate } from "@/helpers";
 import {
-	ComputerDesktopIcon,
-	DevicePhoneMobileIcon,
-	DeviceTabletIcon,
-	PaperClipIcon,
-} from "@heroicons/react/20/solid";
-import { useState } from "react";
-
+	CheckIcon,
+	CopyIcon,
+	DesktopIcon,
+	DownloadIcon,
+	MobileIcon,
+	PaperclipIcon,
+	TabletIcon,
+} from "@/icons";
 import type { Message } from "@/types";
-
-import EmailViewport from "./email-viewport";
-import { classNames, formatDate } from "./helpers";
 
 interface MessagePreviewProps {
 	message: Message;
 }
 
+type TabKey = "html" | "text" | "headers" | "raw";
+
 const VIEWPORTS = [
-	{ label: "Desktop", icon: ComputerDesktopIcon, width: null },
-	{ label: "Tablet", icon: DeviceTabletIcon, width: 768 },
-	{ label: "Mobile", icon: DevicePhoneMobileIcon, width: 375 },
+	{ label: "Desktop", icon: DesktopIcon, width: null },
+	{ label: "Tablet", icon: TabletIcon, width: 768 },
+	{ label: "Mobile", icon: MobileIcon, width: 375 },
 ] as const;
 
+/** Reconstruct an RFC 822 representation from the parsed headers + body. */
+function buildRaw(message: Message, body: string): string {
+	const lines: string[] = [];
+	for (const [key, values] of Object.entries(message.rawHeaders || {})) {
+		for (const value of values) lines.push(`${key}: ${value}`);
+	}
+	return `${lines.join("\n")}\n\n${body}`;
+}
+
 export default function MessagePreview({ message }: MessagePreviewProps) {
-	const html = message.parts.find((part) => {
-		return part.mediaType === "text/html";
-	});
+	const html = message.parts.find((p) => p.mediaType === "text/html");
+	const plainText = message.parts.find((p) => p.mediaType === "text/plain");
 
-	const plainText = message.parts.find((part) => {
-		return part.mediaType === "text/plain";
-	});
-
-	const [tab, setTab] = useState(html ? "text/html" : "text/plain");
+	const [tab, setTab] = useState<TabKey>(html ? "html" : "text");
 	// Email preview width in px, or null for full-width responsive (Desktop).
 	const [viewport, setViewport] = useState<number | null>(null);
 	const [customWidth, setCustomWidth] = useState("");
+	const [copied, setCopied] = useState<string>("");
+
+	const category = deriveCategory(message);
+	const tag = categoryColors(category);
+
+	const raw = useMemo(
+		() => buildRaw(message, html?.data ?? plainText?.data ?? ""),
+		[message, html, plainText],
+	);
+
+	const copy = (key: string, value: string) => {
+		try {
+			navigator.clipboard?.writeText(value);
+		} catch {
+			/* clipboard unavailable */
+		}
+		setCopied(key);
+		window.setTimeout(() => setCopied((c) => (c === key ? "" : c)), 1400);
+	};
+
+	const download = () => {
+		const blob = new Blob([raw], { type: "message/rfc822" });
+		const a = document.createElement("a");
+		a.href = URL.createObjectURL(blob);
+		a.download = `${(message.subject || "message").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.eml`;
+		a.click();
+		URL.revokeObjectURL(a.href);
+	};
+
+	const tabs: { key: TabKey; label: string; show: boolean }[] = [
+		{ key: "html", label: "HTML", show: !!html },
+		{ key: "text", label: "Plain text", show: !!plainText },
+		{ key: "headers", label: "Headers", show: true },
+		{ key: "raw", label: "Raw source", show: true },
+	];
 
 	return (
 		<>
-			<div className="overflow-hidden bg-white shadow sm:rounded-lg">
-				<div className="px-4 py-5 sm:px-6">
-					<h3 className="text-lg font-medium leading-6 text-gray-900">
-						{message.subject}
-					</h3>
-					<p className="mt-1 max-w-2xl text-sm text-gray-500">{message.fromFormatted}</p>
-				</div>
-				<div className="border-t border-gray-200 px-4 py-5 sm:px-6">
-					<dl className="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2">
-						<div className="sm:col-span-1">
-							<dt className="text-sm font-medium text-gray-500">From</dt>
-							<dd className="mt-1 text-sm text-gray-900">{message.from}</dd>
-						</div>
-						<div className="sm:col-span-1">
-							<dt className="text-sm font-medium text-gray-500">To</dt>
-							<dd className="mt-1 text-sm text-gray-900">{message.to.join(" ")}</dd>
-						</div>
-						<div className="sm:col-span-1">
-							<dt className="text-sm font-medium text-gray-500">Date</dt>
-							<dd className="mt-1 text-sm text-gray-900">
+			{/* subject header */}
+			<div className="flex-none border-b border-[#eaecef] bg-white px-8 pt-6 pb-5">
+				<div className="flex items-start justify-between gap-6">
+					<div className="min-w-0">
+						<div className="mb-[7px] flex items-center gap-2.5">
+							<span
+								className="rounded-md px-2 py-[3px] text-[10.5px] font-semibold uppercase tracking-[0.04em]"
+								style={{ color: tag.fg, background: tag.bg }}
+							>
+								{category}
+							</span>
+							<span className="font-mono text-[12.5px] text-[#9aa1ac]">
 								{formatDate(message.date)}
-							</dd>
+							</span>
 						</div>
-						<div className="sm:col-span-1">
-							<dt className="text-sm font-medium text-gray-500">Message Id</dt>
-							<dd className="mt-1 text-sm text-gray-900">{message.messageId}</dd>
-						</div>
-						<div className="sm:col-span-2">
-							<dt className="text-sm font-medium text-gray-500">
-								Attachments ({message.attachments.length})
-							</dt>
-							{(message.attachments || []).length > 0 && (
-								<dd className="mt-1 text-sm text-gray-900">
-									<ul
-										role="list"
-										className="divide-y divide-gray-200 rounded-md border border-gray-200"
-									>
-										{message.attachments.map((attachment, key) => {
-											return (
-												<li
-													className="flex items-center justify-between py-3 pl-3 pr-4 text-sm"
-													key={`att-${key}`}
-												>
-													<div className="flex w-0 flex-1 items-center">
-														<PaperClipIcon
-															className="h-5 w-5 shrink-0 text-gray-400"
-															aria-hidden="true"
-														/>
-														<span className="ml-2 w-0 flex-1 truncate">
-															{attachment.name} (
-															{attachment.mediaType})
-														</span>
-													</div>
-													<div className="ml-4 shrink-0">
-														<a
-															href={`${
-																import.meta.env.VITE_API_URL
-															}/messages/${
-																message.id
-															}/attachments/${key}`}
-															className="font-medium text-indigo-600 hover:text-indigo-500"
-														>
-															Download
-														</a>
-													</div>
-												</li>
-											);
-										})}
-									</ul>
-								</dd>
-							)}
-						</div>
-					</dl>
+						<h1 className="m-0 text-[21px] font-bold leading-[1.25] tracking-[-0.02em]">
+							{message.subject || "(no subject)"}
+						</h1>
+					</div>
+					<button
+						type="button"
+						onClick={download}
+						className="flex h-9 flex-none cursor-pointer items-center gap-[7px] rounded-[9px] border border-[#eaecef] bg-white px-3.5 text-[13px] font-medium text-[#374151] hover:bg-[#f4f5f7]"
+					>
+						<DownloadIcon size={15} />
+						.eml
+					</button>
 				</div>
-				<div className="hidden sm:block">
-					<nav className="flex space-x-4 pl-3 py-2" aria-label="Tabs">
-						{message.parts
-							.sort((a, b) => {
-								if (a.mediaType === "text/html") {
-									return -1;
-								}
-								return a.mediaType > b.mediaType ? 1 : -1;
-							})
-							.map((part) => (
-								<div
-									key={part.mediaType}
+			</div>
+
+			{/* meta grid */}
+			<div className="grid flex-none grid-cols-2 gap-x-10 gap-y-4 border-b border-[#eaecef] bg-white px-8 py-[18px]">
+				<MetaField
+					label="From"
+					value={message.fromFormatted || message.from}
+					copyValue={message.from}
+					copied={copied === "from"}
+					onCopy={() => copy("from", message.from)}
+				/>
+				<MetaField
+					label="To"
+					value={message.to.join(", ")}
+					copied={copied === "to"}
+					onCopy={() => copy("to", message.to.join(", "))}
+				/>
+				<MetaField label="Date" value={formatDate(message.date)} />
+				<MetaField
+					label="Message-Id"
+					value={message.messageId}
+					copied={copied === "id"}
+					onCopy={() => copy("id", message.messageId)}
+					small
+				/>
+			</div>
+
+			{/* attachments */}
+			{message.attachments.length > 0 && (
+				<div className="flex flex-none flex-wrap items-center gap-2 border-b border-[#eaecef] bg-white px-8 py-3">
+					<span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#9aa1ac]">
+						Attachments
+					</span>
+					{message.attachments.map((attachment, index) => (
+						<a
+							key={`att-${index}`}
+							href={`${import.meta.env.VITE_API_URL || ""}/messages/${message.id}/attachments/${index}`}
+							className="flex items-center gap-1.5 rounded-lg border border-[#eaecef] bg-[#fbfbfc] px-2.5 py-1.5 text-[12.5px] font-medium text-[#374151] hover:bg-[#f4f5f7]"
+							title={attachment.mediaType}
+						>
+							<PaperclipIcon size={13} className="text-[#9aa1ac]" />
+							{attachment.name || `attachment-${index + 1}`}
+						</a>
+					))}
+				</div>
+			)}
+
+			{/* toolbar */}
+			<div className="flex flex-none items-center justify-between border-b border-[#eaecef] bg-[#fbfbfc] px-8 py-[11px]">
+				<div className="flex gap-1">
+					{tabs
+						.filter((t) => t.show)
+						.map((t) => {
+							const active = tab === t.key;
+							return (
+								<button
+									key={t.key}
+									type="button"
+									onClick={() => setTab(t.key)}
 									className={classNames(
-										tab === part.mediaType
-											? "bg-gray-100 text-gray-700"
-											: "text-gray-500 hover:text-gray-700",
-										"px-3 py-2 font-medium text-sm rounded-md cursor-pointer",
+										"h-8 cursor-pointer rounded-lg px-3.5 text-[12.5px] font-semibold",
+										active
+											? "bg-[#eef0ff] text-[#4f46e5]"
+											: "bg-transparent text-[#6b7280] hover:text-[#1a1d21]",
 									)}
-									aria-current={tab === part.mediaType ? "page" : undefined}
-									onClick={() => setTab(part.mediaType)}
 								>
-									{part.mediaType}
+									{t.label}
+								</button>
+							);
+						})}
+				</div>
+				{tab === "html" && html && (
+					<div className="flex items-center gap-1 rounded-[9px] bg-[#eef0f2] p-[3px]">
+						{VIEWPORTS.map((v) => {
+							const active = viewport === v.width && customWidth === "";
+							return (
+								<button
+									key={v.label}
+									type="button"
+									title={`${v.label} width`}
+									aria-label={v.label}
+									aria-pressed={active}
+									onClick={() => {
+										setViewport(v.width);
+										setCustomWidth("");
+									}}
+									className={classNames(
+										"flex h-[26px] w-[34px] cursor-pointer items-center justify-center rounded-md",
+										active
+											? "bg-white text-[#4f46e5]"
+											: "bg-transparent text-[#9aa1ac] hover:text-[#6b7280]",
+									)}
+								>
+									<v.icon size={15} />
+								</button>
+							);
+						})}
+						<input
+							type="number"
+							min={200}
+							max={2000}
+							placeholder="px"
+							value={customWidth}
+							onChange={(e) => {
+								const raw = e.target.value;
+								setCustomWidth(raw);
+								const n = parseInt(raw, 10);
+								if (!Number.isNaN(n)) setViewport(n);
+							}}
+							className={classNames(
+								"ml-0.5 h-[26px] w-16 rounded-md border-none bg-transparent px-2 text-[12px] outline-none",
+								customWidth !== ""
+									? "bg-white text-[#4f46e5]"
+									: "text-[#6b7280] placeholder:text-[#9aa1ac]",
+							)}
+						/>
+					</div>
+				)}
+			</div>
+
+			{/* content */}
+			<div className="min-h-0 flex-1 overflow-auto bg-[#eef0f3]">
+				{tab === "html" &&
+					(html ? (
+						<EmailViewport html={html.data} width={viewport} title={message.subject} />
+					) : (
+						<EmptyPane text="No HTML part in this message." />
+					))}
+
+				{tab === "text" &&
+					(plainText ? (
+						<div className="p-7">
+							<pre className="m-0 whitespace-pre-wrap rounded-[12px] bg-white p-6 font-mono text-[13px] leading-[1.7] text-[#374151] shadow-sm">
+								{plainText.data}
+							</pre>
+						</div>
+					) : (
+						<EmptyPane text="No plain-text part in this message." />
+					))}
+
+				{tab === "headers" && (
+					<div className="p-7">
+						<div className="overflow-hidden rounded-[12px] bg-white shadow-sm">
+							{Object.entries(message.rawHeaders).map(([key, values]) => (
+								<div
+									key={key}
+									className="flex gap-5 border-b border-[#f1f2f4] px-[22px] py-[11px]"
+								>
+									<span className="w-40 flex-none font-mono text-[12.5px] font-medium text-[#9aa1ac]">
+										{key}
+									</span>
+									<span className="min-w-0 flex-1 break-all font-mono text-[12.5px] text-[#1a1d21]">
+										{values.join(", ")}
+									</span>
 								</div>
 							))}
-						<div
-							key={"rawHeaders"}
-							className={classNames(
-								tab === "rawHeaders"
-									? "bg-gray-100 text-gray-700"
-									: "text-gray-500 hover:text-gray-700",
-								"px-3 py-2 font-medium text-sm rounded-md cursor-pointer",
-							)}
-							aria-current={tab === "rawHeaders" ? "page" : undefined}
-							onClick={() => setTab("rawHeaders")}
-						>
-							headers
 						</div>
+					</div>
+				)}
 
-						{tab === "text/html" && html && (
-							<div className="ml-auto flex items-center gap-1 pr-3">
-								{VIEWPORTS.map((v) => {
-									const active = viewport === v.width && customWidth === "";
-									return (
-										<button
-											type="button"
-											key={v.label}
-											title={v.label}
-											aria-label={v.label}
-											aria-pressed={active}
-											onClick={() => {
-												setViewport(v.width);
-												setCustomWidth("");
-											}}
-											className={classNames(
-												active
-													? "bg-gray-100 text-gray-700"
-													: "text-gray-500 hover:text-gray-700",
-												"rounded-md p-2 cursor-pointer",
-											)}
-										>
-											<v.icon className="h-5 w-5" aria-hidden="true" />
-										</button>
-									);
-								})}
-								<input
-									type="number"
-									min={200}
-									max={2000}
-									placeholder="px"
-									value={customWidth}
-									onChange={(e) => {
-										const raw = e.target.value;
-										setCustomWidth(raw);
-										const n = parseInt(raw, 10);
-										if (!Number.isNaN(n)) setViewport(n);
-									}}
-									className="w-20 rounded-md border border-gray-300 px-2 py-1 text-sm"
-								/>
-							</div>
-						)}
-					</nav>
-				</div>
-				<div className="pl-6 py-2">
-					{tab === "text/html" &&
-						(html ? (
-							<EmailViewport
-								html={html.data}
-								width={viewport}
-								title={message.subject}
-							/>
-						) : (
-							<p className="text-sm text-gray-500">No HTML part in this message.</p>
-						))}
-
-					{tab === "text/plain" && (
-						<div style={{ whiteSpace: "pre-line" }}>{plainText?.data}</div>
-					)}
-
-					{tab === "rawHeaders" && (
-						<div className="overflow-hidden">
-							<div className="border-t border-gray-200 px-4 py-5 sm:p-0">
-								<dl className="sm:divide-y sm:divide-gray-200">
-									{Object.entries(message.rawHeaders).map(([key, values]) => {
-										return (
-											<div
-												key={key}
-												className="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6"
-											>
-												<dt className="text-sm font-medium text-gray-500">
-													{key}
-												</dt>
-												<dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
-													{values[0]}
-												</dd>
-											</div>
-										);
-									})}
-								</dl>
-							</div>
-						</div>
-					)}
-				</div>
+				{tab === "raw" && (
+					<div className="p-7">
+						<pre className="m-0 whitespace-pre-wrap break-words rounded-[12px] bg-[#1a1d21] p-6 font-mono text-[12.5px] leading-[1.7] text-[#cbd2dc] shadow-md">
+							{raw}
+						</pre>
+					</div>
+				)}
 			</div>
 		</>
 	);
+}
+
+interface MetaFieldProps {
+	label: string;
+	value: string;
+	copyValue?: string;
+	copied?: boolean;
+	onCopy?: () => void;
+	small?: boolean;
+}
+
+function MetaField({ label, value, copied, onCopy, small }: MetaFieldProps) {
+	return (
+		<div className="min-w-0">
+			<div className="mb-[5px] text-[11px] font-semibold uppercase tracking-[0.05em] text-[#9aa1ac]">
+				{label}
+			</div>
+			<div className="flex min-w-0 items-center gap-2">
+				<span
+					className={classNames(
+						"truncate font-mono font-medium",
+						small ? "text-[12.5px] text-[#6b7280]" : "text-[13.5px] text-[#1a1d21]",
+					)}
+				>
+					{value || "—"}
+				</span>
+				{onCopy && (
+					<button
+						type="button"
+						onClick={onCopy}
+						title={`Copy ${label}`}
+						className="flex flex-none cursor-pointer p-px"
+						style={{ color: copied ? "#059669" : "#c2c7cf" }}
+					>
+						{copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
+					</button>
+				)}
+			</div>
+		</div>
+	);
+}
+
+function EmptyPane({ text }: { text: string }) {
+	return <div className="p-7 text-[13px] text-[#9aa1ac]">{text}</div>;
 }

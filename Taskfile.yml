@@ -4,7 +4,7 @@ dotenv: ["maildebug.env", ".env"]
 
 tasks:
     default: task --list-all
-    
+
     client:
         dir: ui
         cmds:
@@ -22,6 +22,18 @@ tasks:
     server:
         cmds:
             - air
+
+    build:
+        desc: Build the UI and compile the single self-contained binary (embeds ui/dist)
+        deps: [client:build]
+        cmds:
+            - go build -o maildebug .
+
+    start:
+        desc: Build and run the fully built app locally (no Docker) — SMTP + HTTP + embedded UI
+        deps: [build]
+        cmds:
+            - ./maildebug
 
     test:
         dir: email-test

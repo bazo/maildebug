@@ -29,8 +29,12 @@ type PartData struct {
 
 type Attachment struct {
 	MediaType string `json:"mediaType"`
-	Data      string `json:"data,omitempty"`
-	Name      string `json:"name"`
+	// Data holds the raw decoded attachment bytes. It must be []byte (not
+	// string): storm persists MailData as JSON, and JSON-encoding a string
+	// rewrites every invalid-UTF-8 byte as U+FFFD, which corrupts binary
+	// attachments like PDFs. []byte round-trips safely as base64.
+	Data []byte `json:"data,omitempty"`
+	Name string `json:"name"`
 }
 
 type MailData struct {
