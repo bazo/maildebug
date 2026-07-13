@@ -6,7 +6,6 @@ package mcpserver
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"maildebug/storage"
@@ -14,11 +13,6 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
-
-// searchAllLimit is the page size used when scanning the whole mailbox for
-// search/wait. maildebug is a debugging tool with modest message counts, so a
-// single large page is simpler than cursoring.
-const searchAllLimit int64 = 1_000_000
 
 type emailSummary struct {
 	ID          string   `json:"id" jsonschema:"unique email id, pass to read_email"`
@@ -67,46 +61,6 @@ func findPart(m *types.MailData, mediaType string) string {
 		}
 	}
 	return ""
-}
-
-// matches reports whether the message satisfies every non-empty filter
-// (case-insensitive substring). Empty filters are ignored.
-func matches(m *types.MailData, to, from, subject, body string) bool {
-	if to != "" {
-		hit := false
-		for _, r := range m.To {
-			if containsFold(r, to) {
-				hit = true
-				break
-			}
-		}
-		if !hit {
-			return false
-		}
-	}
-	if from != "" && !containsFold(m.From, from) && !containsFold(m.FromFormatted, from) {
-		return false
-	}
-	if subject != "" && !containsFold(m.Subject, subject) {
-		return false
-	}
-	if body != "" {
-		hit := false
-		for _, p := range m.Parts {
-			if p != nil && containsFold(p.Data, body) {
-				hit = true
-				break
-			}
-		}
-		if !hit {
-			return false
-		}
-	}
-	return true
-}
-
-func containsFold(haystack, needle string) bool {
-	return strings.Contains(strings.ToLower(haystack), strings.ToLower(needle))
 }
 
 // --- tool I/O types ---
@@ -218,15 +172,13 @@ func New(store *storage.Storage) *mcp.Server {
 		Name:        "search_emails",
 		Description: "Find captured emails matching any combination of recipient, sender, subject or body (case-insensitive substring). All provided filters must match.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in searchInput) (*mcp.CallToolResult, searchOutput, error) {
-		msgs, _, err := store.LoadMessages(1, searchAllLimit)
+		msgs, err := store.SearchMessages(types.SearchFilter{To: in.To, From: in.From, Subject: in.Subject, Body: in.Body})
 		if err != nil {
 			return nil, searchOutput{}, err
 		}
 		out := searchOutput{Emails: []emailSummary{}}
 		for _, m := range msgs {
-			if matches(m, in.To, in.From, in.Subject, in.Body) {
-				out.Emails = append(out.Emails, summarize(m))
-			}
+			out.Emails = append(out.Emails, summarize(m))
 		}
 		out.Count = len(out.Emails)
 		return nil, out, nil
@@ -247,15 +199,14 @@ func New(store *storage.Storage) *mcp.Server {
 		ticker := time.NewTicker(250 * time.Millisecond)
 		defer ticker.Stop()
 
+		filter := types.SearchFilter{To: in.To, From: in.From, Subject: in.Subject, Body: in.Body}
 		for {
-			msgs, _, err := store.LoadMessages(1, searchAllLimit)
+			msgs, err := store.SearchMessages(filter)
 			if err != nil {
 				return nil, waitOutput{}, err
 			}
-			for _, m := range msgs {
-				if matches(m, in.To, in.From, in.Subject, in.Body) {
-					return nil, waitOutput{Email: summarize(m)}, nil
-				}
+			if len(msgs) > 0 {
+				return nil, waitOutput{Email: summarize(msgs[0])}, nil
 			}
 			if time.Now().After(deadline) {
 				return nil, waitOutput{}, fmt.Errorf("no matching email within %dms", timeout.Milliseconds())

@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"log"
 	"maildebug/api"
+	"maildebug/events"
 	"maildebug/mcpserver"
 	"maildebug/session"
 	"maildebug/storage"
@@ -101,6 +102,7 @@ func loadConfig() {
 		MaxMessageBytes:   envInt64("MAX_MESSAGE_BYTES", 1048576),
 		MaxRecipients:     envInt("MAX_RECIPIENTS", 50),
 		AllowInsecureAuth: envBool("ALLOW_INSECURE_AUTH", true),
+		SpamAssassin:      envOrDefault("SPAMASSASSIN", ""),
 	}
 }
 
@@ -109,7 +111,9 @@ func main() {
 
 	storage := storage.NewStorage()
 
-	api := api.NewApi(storage)
+	hub := events.NewHub()
+
+	api := api.NewApi(storage, hub, config.SpamAssassin)
 
 	if err := storage.Init(config.DbName); err != nil {
 		log.Fatal("Opening db: ", err)
@@ -126,6 +130,13 @@ func main() {
 			return fmt.Errorf("persist message record: %w", err)
 		}
 		log.Println("message saved", data.Id, data.MessageId)
+		hub.Publish(events.Event{
+			Type:    "message",
+			ID:      data.Id,
+			From:    data.FromFormatted,
+			Subject: data.Subject,
+			Date:    data.Date.Format(time.RFC3339),
+		})
 		return nil
 	}))
 
@@ -168,8 +179,16 @@ func main() {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
+	router.GET("/events", api.EventsHandler)
 	router.GET("/messages", api.LoadMessagesHandler)
+	router.GET("/messages/:id", api.LoadMessageHandler)
+	router.GET("/messages/:id/raw", api.RawMessageHandler)
+	router.GET("/messages/:id/checks", api.ChecksHandler)
+	router.GET("/messages/:id/link-check", api.LinkCheckHandler)
+	router.GET("/messages/:id/spam-check", api.SpamCheckHandler)
 	router.GET("/messages/:id/attachments/:index", api.LoadMessagesAttachment)
+	router.POST("/messages/:id/read", api.MarkReadHandler)
+	router.DELETE("/messages/:id", api.DeleteMessageHandler)
 	router.DELETE("/messages", api.DeleteMessagesHandler)
 
 	// MCP server (Streamable HTTP) so LLMs/agents can verify captured emails.

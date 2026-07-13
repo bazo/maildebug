@@ -9,11 +9,28 @@ import (
 	"math"
 	"mime"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/asdine/storm"
 	"github.com/uptrace/bunrouter"
 )
+
+// paginate returns the page-th slice (1-based) of size limit from msgs.
+func paginate(msgs []*types.MailData, page, limit int64) []*types.MailData {
+	if limit <= 0 {
+		return msgs
+	}
+	start := (page - 1) * limit
+	if start < 0 || start >= int64(len(msgs)) {
+		return []*types.MailData{}
+	}
+	end := start + limit
+	if end > int64(len(msgs)) {
+		end = int64(len(msgs))
+	}
+	return msgs[start:end]
+}
 
 func (api *Api) LoadMessagesHandler(w http.ResponseWriter, r *http.Request) {
 
@@ -37,7 +54,28 @@ func (api *Api) LoadMessagesHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	messages, total, err := api.storage.LoadMessages(page, limit)
+	q := r.URL.Query()
+	filter := types.SearchFilter{
+		Q:       q.Get("search"),
+		To:      q.Get("to"),
+		From:    q.Get("from"),
+		Subject: q.Get("subject"),
+		Body:    q.Get("body"),
+	}
+
+	var (
+		messages []*types.MailData
+		total    int64
+	)
+	if filter.IsZero() {
+		messages, total, err = api.storage.LoadMessages(page, limit)
+	} else {
+		// Search matches across the whole mailbox, then paginate the result.
+		var matched []*types.MailData
+		matched, err = api.storage.SearchMessages(filter)
+		total = int64(len(matched))
+		messages = paginate(matched, page, limit)
+	}
 
 	if err != nil {
 		createErrorResponse(w, err, http.StatusInternalServerError)
@@ -50,13 +88,41 @@ func (api *Api) LoadMessagesHandler(w http.ResponseWriter, r *http.Request) {
 
 	pagesCount = int64(math.Ceil(x))
 
+	unread, err := api.storage.UnreadCount()
+	if err != nil {
+		createErrorResponse(w, err, http.StatusInternalServerError)
+		return
+	}
+
 	response := types.ApiResponse{
 		Page:       page,
 		PagesCount: pagesCount,
+		Unread:     unread,
 		Messages:   messages,
 	}
 
 	createResponse(w, response, http.StatusOK)
+}
+
+// MarkReadHandler flags a single message as read.
+func (api *Api) MarkReadHandler(w http.ResponseWriter, r *http.Request) {
+	id, ok := bunrouter.ParamsFromContext(r.Context()).Get("id")
+	if !ok {
+		createErrorResponse(w, fmt.Errorf("id not provided"), http.StatusBadRequest)
+		return
+	}
+
+	if err := api.storage.MarkRead(id); err != nil {
+		if errors.Is(err, storm.ErrNotFound) {
+			createErrorResponse(w, fmt.Errorf("message %s not found", id), http.StatusNotFound)
+			return
+		}
+		createErrorResponse(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Access-Control-Allow-Methods", "*")
+	createResponse(w, types.ApiResponse{}, http.StatusOK)
 }
 
 func (api *Api) LoadMessagesAttachment(w http.ResponseWriter, r *http.Request) {
@@ -109,6 +175,81 @@ func (api *Api) LoadMessagesAttachment(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": attachment.Name}))
 	w.Header().Set("Content-Type", attachment.MediaType)
 	io.Copy(w, bytes.NewReader(attachment.Data))
+}
+
+// LoadMessageHandler returns a single message with full parts/headers. Like
+// LoadMessages it strips the heavy decoded attachment bytes (fetched separately
+// via the attachment endpoint).
+func (api *Api) LoadMessageHandler(w http.ResponseWriter, r *http.Request) {
+	id, ok := bunrouter.ParamsFromContext(r.Context()).Get("id")
+	if !ok {
+		createErrorResponse(w, fmt.Errorf("id not provided"), http.StatusBadRequest)
+		return
+	}
+
+	message, err := api.storage.LoadMessage(id)
+	if err != nil {
+		if errors.Is(err, storm.ErrNotFound) {
+			createErrorResponse(w, fmt.Errorf("message %s not found", id), http.StatusNotFound)
+			return
+		}
+		createErrorResponse(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	for _, att := range message.Attachments {
+		att.Data = nil
+	}
+
+	createResponse(w, message, http.StatusOK)
+}
+
+// DeleteMessageHandler deletes one message by id.
+func (api *Api) DeleteMessageHandler(w http.ResponseWriter, r *http.Request) {
+	id, ok := bunrouter.ParamsFromContext(r.Context()).Get("id")
+	if !ok {
+		createErrorResponse(w, fmt.Errorf("id not provided"), http.StatusBadRequest)
+		return
+	}
+
+	if err := api.storage.DeleteMessage(id); err != nil {
+		if errors.Is(err, storm.ErrNotFound) {
+			createErrorResponse(w, fmt.Errorf("message %s not found", id), http.StatusNotFound)
+			return
+		}
+		createErrorResponse(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Access-Control-Allow-Methods", "*")
+	createResponse(w, types.ApiResponse{}, http.StatusOK)
+}
+
+// RawMessageHandler streams the original RFC 822 bytes stored on disk. With
+// ?download=1 it sets an attachment disposition so browsers save a .eml file.
+func (api *Api) RawMessageHandler(w http.ResponseWriter, r *http.Request) {
+	id, ok := bunrouter.ParamsFromContext(r.Context()).Get("id")
+	if !ok {
+		createErrorResponse(w, fmt.Errorf("id not provided"), http.StatusBadRequest)
+		return
+	}
+
+	raw, err := os.ReadFile("data/messages/" + id)
+	if err != nil {
+		if os.IsNotExist(err) {
+			createErrorResponse(w, fmt.Errorf("message %s not found", id), http.StatusNotFound)
+			return
+		}
+		createErrorResponse(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-Type", "message/rfc822")
+	if r.URL.Query().Has("download") {
+		w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": id + ".eml"}))
+	}
+	w.Write(raw)
 }
 
 func (api *Api) DeleteMessagesHandler(w http.ResponseWriter, r *http.Request) {

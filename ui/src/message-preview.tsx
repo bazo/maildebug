@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
+import ChecksPanel from "@/checks-panel";
 import EmailViewport from "@/email-viewport";
 import { categoryColors, classNames, deriveCategory, formatDate } from "@/helpers";
 import {
@@ -10,14 +11,18 @@ import {
 	MobileIcon,
 	PaperclipIcon,
 	TabletIcon,
+	TrashIcon,
 } from "@/icons";
 import type { Message } from "@/types";
 
+const API = import.meta.env.VITE_API_URL || "";
+
 interface MessagePreviewProps {
 	message: Message;
+	onDelete?: (id: string) => void;
 }
 
-type TabKey = "html" | "text" | "headers" | "raw";
+type TabKey = "html" | "text" | "headers" | "raw" | "checks";
 
 const VIEWPORTS = [
 	{ label: "Desktop", icon: DesktopIcon, width: null },
@@ -25,16 +30,7 @@ const VIEWPORTS = [
 	{ label: "Mobile", icon: MobileIcon, width: 375 },
 ] as const;
 
-/** Reconstruct an RFC 822 representation from the parsed headers + body. */
-function buildRaw(message: Message, body: string): string {
-	const lines: string[] = [];
-	for (const [key, values] of Object.entries(message.rawHeaders || {})) {
-		for (const value of values) lines.push(`${key}: ${value}`);
-	}
-	return `${lines.join("\n")}\n\n${body}`;
-}
-
-export default function MessagePreview({ message }: MessagePreviewProps) {
+export default function MessagePreview({ message, onDelete }: MessagePreviewProps) {
 	const html = message.parts.find((p) => p.mediaType === "text/html");
 	const plainText = message.parts.find((p) => p.mediaType === "text/plain");
 
@@ -43,14 +39,27 @@ export default function MessagePreview({ message }: MessagePreviewProps) {
 	const [viewport, setViewport] = useState<number | null>(null);
 	const [customWidth, setCustomWidth] = useState("");
 	const [copied, setCopied] = useState<string>("");
+	// True on-disk RFC 822 source, fetched lazily when the Raw tab is opened.
+	const [raw, setRaw] = useState<string | null>(null);
 
 	const category = deriveCategory(message);
 	const tag = categoryColors(category);
 
-	const raw = useMemo(
-		() => buildRaw(message, html?.data ?? plainText?.data ?? ""),
-		[message, html, plainText],
-	);
+	useEffect(() => {
+		if (tab !== "raw" || raw !== null) return;
+		let cancelled = false;
+		fetch(`${API}/messages/${message.id}/raw`, { mode: "cors" })
+			.then((r) => r.text())
+			.then((t) => {
+				if (!cancelled) setRaw(t);
+			})
+			.catch(() => {
+				if (!cancelled) setRaw("Failed to load raw source.");
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [tab, raw, message.id]);
 
 	const copy = (key: string, value: string) => {
 		try {
@@ -63,12 +72,10 @@ export default function MessagePreview({ message }: MessagePreviewProps) {
 	};
 
 	const download = () => {
-		const blob = new Blob([raw], { type: "message/rfc822" });
 		const a = document.createElement("a");
-		a.href = URL.createObjectURL(blob);
+		a.href = `${API}/messages/${message.id}/raw?download=1`;
 		a.download = `${(message.subject || "message").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.eml`;
 		a.click();
-		URL.revokeObjectURL(a.href);
 	};
 
 	const tabs: { key: TabKey; label: string; show: boolean }[] = [
@@ -76,6 +83,7 @@ export default function MessagePreview({ message }: MessagePreviewProps) {
 		{ key: "text", label: "Plain text", show: !!plainText },
 		{ key: "headers", label: "Headers", show: true },
 		{ key: "raw", label: "Raw source", show: true },
+		{ key: "checks", label: "Checks", show: true },
 	];
 
 	return (
@@ -99,14 +107,26 @@ export default function MessagePreview({ message }: MessagePreviewProps) {
 							{message.subject || "(no subject)"}
 						</h1>
 					</div>
-					<button
-						type="button"
-						onClick={download}
-						className="flex h-9 flex-none cursor-pointer items-center gap-[7px] rounded-[9px] border border-[#eaecef] bg-white px-3.5 text-[13px] font-medium text-[#374151] hover:bg-[#f4f5f7]"
-					>
-						<DownloadIcon size={15} />
-						.eml
-					</button>
+					<div className="flex flex-none items-center gap-2">
+						<button
+							type="button"
+							onClick={download}
+							className="flex h-9 cursor-pointer items-center gap-[7px] rounded-[9px] border border-[#eaecef] bg-white px-3.5 text-[13px] font-medium text-[#374151] hover:bg-[#f4f5f7]"
+						>
+							<DownloadIcon size={15} />
+							.eml
+						</button>
+						{onDelete && (
+							<button
+								type="button"
+								title="Delete message"
+								onClick={() => onDelete(message.id)}
+								className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-[9px] border border-[#eaecef] bg-white text-[#6b7280] hover:border-[#fecaca] hover:bg-[#fef2f2] hover:text-[#dc2626]"
+							>
+								<TrashIcon size={15} />
+							</button>
+						)}
+					</div>
 				</div>
 			</div>
 
@@ -271,10 +291,12 @@ export default function MessagePreview({ message }: MessagePreviewProps) {
 				{tab === "raw" && (
 					<div className="p-7">
 						<pre className="m-0 whitespace-pre-wrap break-words rounded-[12px] bg-[#1a1d21] p-6 font-mono text-[12.5px] leading-[1.7] text-[#cbd2dc] shadow-md">
-							{raw}
+							{raw ?? "Loading raw source…"}
 						</pre>
 					</div>
 				)}
+
+				{tab === "checks" && <ChecksPanel id={message.id} />}
 			</div>
 		</>
 	);

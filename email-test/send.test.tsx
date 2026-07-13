@@ -35,9 +35,11 @@ let server: Subprocess | undefined;
 let workDir = "";
 
 interface ApiMessage {
+	id: string;
 	subject: string;
 	from: string;
 	to: string[];
+	read: boolean;
 	parts: { mediaType: string; data: string }[];
 }
 
@@ -180,5 +182,132 @@ describe("capturing rendered emails", () => {
 		expect(htmlPart).toBeDefined();
 		expect(htmlPart!.data).toContain("@media");
 		expect(htmlPart!.data).toContain("max-width: 600px");
+	}, 20000);
+});
+
+describe("live UX + core endpoints", () => {
+	async function sendPlain(to: string, subject: string, body: string, extraHeaders = "") {
+		// nodemailer can't set List-Unsubscribe easily; use a raw SMTP send.
+		const raw =
+			`Subject: ${subject}\r\nFrom: sender@example.com\r\nTo: ${to}\r\n` +
+			extraHeaders +
+			`\r\n${body}`;
+		await new Promise<void>((resolve, reject) => {
+			const sock = connect({ host: "127.0.0.1", port: SMTP_PORT }, () => {
+				let step = 0;
+				const script = [
+					`HELO test\r\n`,
+					`MAIL FROM:<sender@example.com>\r\n`,
+					`RCPT TO:<${to}>\r\n`,
+					`DATA\r\n`,
+					`${raw}\r\n.\r\n`,
+					`QUIT\r\n`,
+				];
+				sock.on("data", () => {
+					if (step < script.length) sock.write(script[step++]);
+					else {
+						sock.end();
+						resolve();
+					}
+				});
+			});
+			sock.on("error", reject);
+		});
+	}
+
+	test("server-side search filters across all fields", async () => {
+		await sendPlain("bob@x.com", "Your receipt", "thanks for your order");
+		await sendPlain("carol@y.com", "Weekly newsletter", "big sale inside");
+		await waitForMessage("Your receipt");
+		await waitForMessage("Weekly newsletter");
+
+		const search = async (qs: string) => {
+			const r = await fetch(`${API_BASE}/messages?${qs}`);
+			const b = (await r.json()) as { messages: ApiMessage[] };
+			return b.messages.map((m) => m.subject);
+		};
+
+		expect(await search("search=receipt")).toEqual(["Your receipt"]);
+		expect(await search("to=carol")).toEqual(["Weekly newsletter"]);
+		expect(await search("body=sale")).toEqual(["Weekly newsletter"]);
+	}, 20000);
+
+	test("raw endpoint returns the true on-disk bytes", async () => {
+		await sendPlain("r@x.com", "raw-check", "hello raw");
+		const msg = await waitForMessage("raw-check");
+		const raw = await fetch(`${API_BASE}/messages/${msg.id}/raw`).then((r) => r.text());
+		expect(raw).toContain("Subject: raw-check");
+		expect(raw).toContain("hello raw");
+	}, 20000);
+
+	test("read state and single delete", async () => {
+		await sendPlain("r@x.com", "read-check", "body");
+		const msg = await waitForMessage("read-check");
+
+		let list = await fetch(`${API_BASE}/messages`).then((r) => r.json());
+		expect(list.unread).toBe(1);
+
+		const readRes = await fetch(`${API_BASE}/messages/${msg.id}/read`, { method: "POST" });
+		expect(readRes.ok).toBe(true);
+
+		const single = (await fetch(`${API_BASE}/messages/${msg.id}`).then((r) =>
+			r.json(),
+		)) as ApiMessage;
+		expect(single.read).toBe(true);
+
+		list = await fetch(`${API_BASE}/messages`).then((r) => r.json());
+		expect(list.unread).toBe(0);
+
+		const del = await fetch(`${API_BASE}/messages/${msg.id}`, { method: "DELETE" });
+		expect(del.ok).toBe(true);
+		expect(await fetch(`${API_BASE}/messages/${msg.id}`).then((r) => r.status)).toBe(404);
+	}, 20000);
+
+	test("checks endpoint validates List-Unsubscribe and HTML", async () => {
+		await sendPlain(
+			"r@x.com",
+			"checks-msg",
+			"<html><body><script>x</script><a href='https://ex.com'>a</a></body></html>",
+			`List-Unsubscribe: <https://ex.com/u>, <mailto:u@ex.com>\r\nList-Unsubscribe-Post: List-Unsubscribe=One-Click\r\nContent-Type: text/html\r\n`,
+		);
+		const msg = await waitForMessage("checks-msg");
+		const checks = await fetch(`${API_BASE}/messages/${msg.id}/checks`).then((r) => r.json());
+		expect(checks.unsubscribe.status).toBe("pass");
+		expect(checks.unsubscribe.oneClick).toBe(true);
+		expect(checks.html.hasHtml).toBe(true);
+		expect(checks.html.status).toBe("fail"); // <script> present
+	}, 20000);
+
+	test("spam-check returns 409 when unconfigured", async () => {
+		await sendPlain("r@x.com", "spam-msg", "body");
+		const msg = await waitForMessage("spam-msg");
+		const res = await fetch(`${API_BASE}/messages/${msg.id}/spam-check`);
+		expect(res.status).toBe(409);
+	}, 20000);
+
+	test("SSE stream pushes a new-message event", async () => {
+		const controller = new AbortController();
+		const res = await fetch(`${API_BASE}/events`, { signal: controller.signal });
+		const reader = res.body!.getReader();
+		const decoder = new TextDecoder();
+
+		// Give the subscription a moment, then send a mail.
+		await Bun.sleep(200);
+		await sendPlain("r@x.com", "sse-event", "body");
+
+		let buf = "";
+		const deadline = Date.now() + 8000;
+		try {
+			while (Date.now() < deadline) {
+				const { value, done } = await reader.read();
+				if (done) break;
+				buf += decoder.decode(value, { stream: true });
+				if (buf.includes("sse-event")) break;
+			}
+		} finally {
+			controller.abort();
+		}
+		expect(buf).toContain("data:");
+		expect(buf).toContain("sse-event");
 	}, 20000);
 });

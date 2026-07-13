@@ -39,9 +39,16 @@ Top-level `main.go` wires everything together:
     - If `mail.ReadMessage` fails, the raw bytes are still persisted (with `Date = now`) so nothing is lost — only parsing is skipped.
     - On success the `dataCallback` (defined in `main.go`) writes the raw bytes to disk and persists the parsed `MailData`.
 4. **HTTP API** (`api/`) — `bunrouter` with `reqlog` middleware. Endpoints:
-    - `GET /messages?page=&maxPerPage=` — paginated list (default 50/page, computes `pagesCount`).
+    - `GET /messages?page=&maxPerPage=` — paginated list (default 50/page, computes `pagesCount`, includes `unread` count). Also accepts `search=`/`to=`/`from=`/`subject=`/`body=` filter params; when any is set the whole mailbox is filtered (via `storage.SearchMessages`, sharing `storage.Matches` with the MCP tools) and the result paginated.
+    - `GET /messages/:id` — one message (full parts/headers, attachment bytes stripped).
+    - `GET /messages/:id/raw?download=` — streams the true on-disk RFC 822 bytes (`data/messages/<id>`); `?download=1` sets an attachment disposition for `.eml` save.
+    - `GET /messages/:id/checks` — no-network QA checks (List-Unsubscribe validation + heuristic HTML-compatibility scan) from `check.Run`.
+    - `GET /messages/:id/link-check` — extracts and probes every http(s) link/image (on-demand; makes outbound requests).
+    - `GET /messages/:id/spam-check` — scores the message via the configured SpamAssassin `spamd` (`check.SpamCheck`); `409` when `MAILDEBUG_SPAMASSASSIN` is unset.
     - `GET /messages/:id/attachments/:index` — base64-decodes the attachment from the stored `MailData` and streams it with the original filename/media type.
-    - `DELETE /messages` — wipe.
+    - `POST /messages/:id/read` — marks one message read (`storage.MarkRead`).
+    - `DELETE /messages/:id` — delete one (record + on-disk raw). `DELETE /messages` — wipe all.
+    - `GET /events` — Server-Sent Events stream (`text/event-stream`); the SMTP `dataCallback` publishes a new-message event to `events.Hub`, which the UI consumes for live updates + browser notifications. Relies on `http.Flusher` (preserved through `reqlog`'s `httpsnoop` wrapper).
     - All responses go through `createResponse`/`createErrorResponse` which set permissive CORS (`*`).
     - `OPTIONS /*p` returns `200` with `Access-Control-Allow-*: *` for CORS preflight.
 5. **MCP server** (`mcpserver/`) — a Model Context Protocol server (official `github.com/modelcontextprotocol/go-sdk`) so LLMs/agents can verify captured email. Built once via `mcpserver.New(storage)` and mounted on the same HTTP server over **Streamable HTTP** at `/mcp` (GET/POST/DELETE all routed to one `mcp.NewStreamableHTTPHandler`). Tools: `list_emails`, `read_email` (decoded html/text + headers), `search_emails` (case-insensitive substring AND over to/from/subject/body), `wait_for_email` (polls until a match or timeout — for async flows), `clear_emails`. Tool I/O is typed structs with `jsonschema` tags; handlers call straight into `storage`. Connect with `claude mcp add maildebug --transport http http://localhost:8100/mcp`.
@@ -50,7 +57,7 @@ Top-level `main.go` wires everything together:
 
 ### UI
 
-`ui/` is a Vite + React 19 + TanStack Query + Tailwind v4 app. The `@/` alias points to `ui/src`. `react-headless-pagination` drives the paginator. HTML message bodies render via `email-viewport.tsx`, which sanitizes with `lettersanitizer` (the engine `react-letter` wraps) and writes the result into a width-controlled sandboxed `<iframe>` so the email's own `@media` breakpoints fire — the preview pane has Desktop/Tablet/Mobile + custom-width controls (Mailtrap-style). Components are flat under `ui/src/` (`app.tsx`, `message-preview.tsx`, etc.). When developing, run the Go server on `:8100` and Vite on `:5173` — the UI calls the Go API directly with permissive CORS.
+`ui/` is a Vite + React 19 + TanStack Query + Tailwind v4 app. The `@/` alias points to `ui/src`. `react-headless-pagination` drives the paginator. HTML message bodies render via `email-viewport.tsx`, which sanitizes with `lettersanitizer` (the engine `react-letter` wraps) and writes the result into a width-controlled sandboxed `<iframe>` so the email's own `@media` breakpoints fire — the preview pane has Desktop/Tablet/Mobile + custom-width controls (Mailtrap-style). Components are flat under `ui/src/` (`app.tsx`, `message-preview.tsx`, `checks-panel.tsx`, etc.). The list search box hits the server-side search API (debounced); an `EventSource` on `/events` drives live inbox updates + optional browser notifications and a "Live" indicator; rows show read/unread state and an inbox unread badge. `message-preview.tsx` tabs are HTML / Plain text / Headers / Raw source (fetched from `/raw`) / Checks (`checks-panel.tsx`: List-Unsubscribe, HTML compatibility, on-demand link and spam checks). When developing, run the Go server on `:8100` and Vite on `:5173` — the UI calls the Go API directly with permissive CORS.
 
 ### email-test harness
 

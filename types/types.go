@@ -19,6 +19,10 @@ type Config struct {
 	MaxMessageBytes   int64
 	MaxRecipients     int
 	AllowInsecureAuth bool
+
+	// SpamAssassin is the host:port of a spamd daemon (e.g. "localhost:783").
+	// Empty disables the spam-check endpoint.
+	SpamAssassin string
 }
 
 type PartData struct {
@@ -45,13 +49,31 @@ type MailData struct {
 	To            []string      `json:"to"`
 	Subject       string        `json:"subject"`
 	Date          time.Time     `json:"date" storm:"index"`
+	Read          bool          `json:"read"`
 	Parts         []*PartData   `json:"parts"`
 	Attachments   []*Attachment `json:"attachments"`
 	RawHeaders    mail.Header   `json:"rawHeaders"`
 }
 
+// SearchFilter describes a case-insensitive substring query over captured mail.
+// Q matches ANY of recipient/sender/subject/body; the field-specific filters
+// each must match (AND). Empty fields are ignored.
+type SearchFilter struct {
+	Q       string
+	To      string
+	From    string
+	Subject string
+	Body    string
+}
+
+// IsZero reports whether the filter has no active criteria.
+func (f SearchFilter) IsZero() bool {
+	return f.Q == "" && f.To == "" && f.From == "" && f.Subject == "" && f.Body == ""
+}
+
 type ApiResponse struct {
 	Page       int64       `json:"page"`
 	PagesCount int64       `json:"pagesCount"`
+	Unread     int         `json:"unread"`
 	Messages   []*MailData `json:"messages"`
 }

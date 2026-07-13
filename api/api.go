@@ -3,17 +3,22 @@ package api
 import (
 	"encoding/json"
 	"log"
+	"maildebug/events"
 	"maildebug/storage"
 	"net/http"
 )
 
 type Api struct {
-	storage *storage.Storage
+	storage  *storage.Storage
+	hub      *events.Hub
+	spamAddr string
 }
 
-func NewApi(storage *storage.Storage) *Api {
+func NewApi(storage *storage.Storage, hub *events.Hub, spamAddr string) *Api {
 	return &Api{
-		storage,
+		storage:  storage,
+		hub:      hub,
+		spamAddr: spamAddr,
 	}
 }
 

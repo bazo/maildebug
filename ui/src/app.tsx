@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
 	avatarColor,
@@ -27,12 +27,21 @@ export default function App() {
 	const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
 	const [page, setPage] = useState(1);
 	const [query, setQuery] = useState("");
+	const [live, setLive] = useState(false);
+	const search = useDebounced(query.trim(), 250);
+
+	// Reset to the first page whenever the search term changes.
+	useEffect(() => {
+		setPage(1);
+	}, [search]);
 
 	const { data, refetch } = useQuery<MessagesResponse>({
-		queryKey: ["messages", page],
+		queryKey: ["messages", page, search],
 		queryFn: async (): Promise<MessagesResponse> => {
+			const params = new URLSearchParams({ page: String(page) });
+			if (search) params.set("search", search);
 			return (
-				await fetch(`${import.meta.env.VITE_API_URL || ""}/messages?page=${page}`, {
+				await fetch(`${import.meta.env.VITE_API_URL || ""}/messages?${params}`, {
 					mode: "cors",
 				})
 			).json();
@@ -41,14 +50,27 @@ export default function App() {
 
 	const messages = useMemo(() => data?.messages ?? [], [data]);
 	const pagesCount = data?.pagesCount || 1;
+	const unread = data?.unread ?? 0;
 
-	const filtered = useMemo(() => {
-		const q = query.trim().toLowerCase();
-		if (!q) return messages;
-		return messages.filter((m) =>
-			`${m.from} ${displayName(m)} ${m.subject}`.toLowerCase().includes(q),
-		);
-	}, [messages, query]);
+	// Server already applied the search; render the returned page as-is.
+	const filtered = messages;
+
+	const markReadMutation = useMutation({
+		mutationFn: (id: string) => {
+			return fetch(`${import.meta.env.VITE_API_URL || ""}/messages/${id}/read`, {
+				method: "POST",
+				mode: "cors",
+			});
+		},
+		onSuccess() {
+			refetch();
+		},
+	});
+
+	const handleSelect = (message: Message) => {
+		setSelectedMessage(message);
+		if (!message.read) markReadMutation.mutate(message.id);
+	};
 
 	const trashMutation = useMutation({
 		mutationFn: () => {
@@ -68,6 +90,49 @@ export default function App() {
 			trashMutation.mutate();
 		}
 	};
+
+	const deleteOneMutation = useMutation({
+		mutationFn: (id: string) => {
+			return fetch(`${import.meta.env.VITE_API_URL || ""}/messages/${id}`, {
+				method: "DELETE",
+				mode: "cors",
+			});
+		},
+		onSuccess(_data, id) {
+			setSelectedMessage((current) => (current?.id === id ? null : current));
+			refetch();
+		},
+	});
+
+	// Live updates: subscribe to the server's SSE stream. On each new message,
+	// refetch the current view and (if permitted) raise a browser notification.
+	useEffect(() => {
+		const url = `${import.meta.env.VITE_API_URL || ""}/events`;
+		const es = new EventSource(url);
+		es.onopen = () => setLive(true);
+		es.onerror = () => setLive(false);
+		es.onmessage = (ev) => {
+			refetch();
+			try {
+				const data = JSON.parse(ev.data) as { subject?: string; from?: string };
+				if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+					new Notification(data.subject || "New message", {
+						body: data.from || undefined,
+					});
+				}
+			} catch {
+				/* ignore malformed events */
+			}
+		};
+		return () => es.close();
+	}, [refetch]);
+
+	// Ask for notification permission once, lazily.
+	useEffect(() => {
+		if (typeof Notification !== "undefined" && Notification.permission === "default") {
+			Notification.requestPermission().catch(() => {});
+		}
+	}, []);
 
 	const countLabel = query
 		? `${filtered.length} found`
@@ -90,8 +155,13 @@ export default function App() {
 							<span className="text-[15px] font-semibold tracking-[-0.01em]">
 								Mail Debug
 							</span>
-							<span className="mt-0.5 text-[11.5px] font-medium text-[#9aa1ac]">
-								Outbound preview
+							<span className="mt-0.5 flex items-center gap-1.5 text-[11.5px] font-medium text-[#9aa1ac]">
+								<span
+									title={live ? "Live — receiving new mail" : "Reconnecting…"}
+									className="inline-block h-[7px] w-[7px] flex-none rounded-full"
+									style={{ background: live ? "#22c55e" : "#d1d5db" }}
+								/>
+								{live ? "Live" : "Outbound preview"}
 							</span>
 						</div>
 					</div>
@@ -145,8 +215,13 @@ export default function App() {
 
 				{/* count row */}
 				<div className="flex items-center justify-between px-5 pt-0.5 pb-2.5">
-					<span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#9aa1ac]">
+					<span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-[#9aa1ac]">
 						Inbox
+						{unread > 0 && (
+							<span className="rounded-full bg-[#4f46e5] px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+								{unread}
+							</span>
+						)}
 					</span>
 					<span className="text-[11.5px] font-semibold text-[#6b7280]">{countLabel}</span>
 				</div>
@@ -158,7 +233,7 @@ export default function App() {
 							key={message.id}
 							message={message}
 							selected={selectedMessage?.id === message.id}
-							onSelect={() => setSelectedMessage(message)}
+							onSelect={() => handleSelect(message)}
 						/>
 					))}
 					{filtered.length === 0 && (
@@ -197,13 +272,27 @@ export default function App() {
 			{/* ============ READER ============ */}
 			<main className="flex min-w-0 flex-1 flex-col overflow-hidden">
 				{selectedMessage ? (
-					<MessagePreview key={selectedMessage.id} message={selectedMessage} />
+					<MessagePreview
+						key={selectedMessage.id}
+						message={selectedMessage}
+						onDelete={(id) => deleteOneMutation.mutate(id)}
+					/>
 				) : (
 					<EmptyReader cleared={messages.length === 0 && !query} />
 				)}
 			</main>
 		</div>
 	);
+}
+
+// useDebounced returns value after it has stopped changing for `delay` ms.
+function useDebounced<T>(value: T, delay: number): T {
+	const [debounced, setDebounced] = useState(value);
+	useEffect(() => {
+		const t = window.setTimeout(() => setDebounced(value), delay);
+		return () => window.clearTimeout(t);
+	}, [value, delay]);
+	return debounced;
 }
 
 interface MessageRowProps {
@@ -239,7 +328,18 @@ function MessageRow({ message, selected, onSelect }: MessageRowProps) {
 				</div>
 				<div className="min-w-0 flex-1">
 					<div className="flex items-center gap-2">
-						<span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold text-[#1a1d21]">
+						{!message.read && (
+							<span
+								className="h-[7px] w-[7px] flex-none rounded-full bg-[#4f46e5]"
+								title="Unread"
+							/>
+						)}
+						<span
+							className={classNames(
+								"min-w-0 flex-1 truncate text-[13.5px] text-[#1a1d21]",
+								message.read ? "font-medium" : "font-bold",
+							)}
+						>
 							{displayName(message)}
 						</span>
 						<span className="flex-none text-[11px] font-medium text-[#9aa1ac]">
