@@ -163,7 +163,7 @@ export default function MessagePreview({ message, onDelete }: MessagePreviewProp
 					</span>
 					{message.attachments.map((attachment, index) => (
 						<a
-							key={`att-${index}`}
+							key={`${attachment.name}:${attachment.mediaType}`}
 							href={`${import.meta.env.VITE_API_URL || ""}/messages/${message.id}/attachments/${index}`}
 							className="flex items-center gap-1.5 rounded-lg border border-[#eaecef] bg-[#fbfbfc] px-2.5 py-1.5 text-[12.5px] font-medium text-[#374151] hover:bg-[#f4f5f7]"
 							title={attachment.mediaType}
@@ -178,26 +178,25 @@ export default function MessagePreview({ message, onDelete }: MessagePreviewProp
 			{/* toolbar */}
 			<div className="flex flex-none items-center justify-between border-b border-[#eaecef] bg-[#fbfbfc] px-8 py-[11px]">
 				<div className="flex gap-1">
-					{tabs
-						.filter((t) => t.show)
-						.map((t) => {
-							const active = tab === t.key;
-							return (
-								<button
-									key={t.key}
-									type="button"
-									onClick={() => setTab(t.key)}
-									className={classNames(
-										"h-8 cursor-pointer rounded-lg px-3.5 text-[12.5px] font-semibold",
-										active
-											? "bg-[#eef0ff] text-[#4f46e5]"
-											: "bg-transparent text-[#6b7280] hover:text-[#1a1d21]",
-									)}
-								>
-									{t.label}
-								</button>
-							);
-						})}
+					{tabs.flatMap((t) =>
+						t.show
+							? [
+									<button
+										key={t.key}
+										type="button"
+										onClick={() => setTab(t.key)}
+										className={classNames(
+											"h-8 cursor-pointer rounded-lg px-3.5 text-[12.5px] font-semibold",
+											tab === t.key
+												? "bg-[#eef0ff] text-[#4f46e5]"
+												: "bg-transparent text-[#6b7280] hover:text-[#1a1d21]",
+										)}
+									>
+										{t.label}
+									</button>,
+								]
+							: [],
+					)}
 				</div>
 				{tab === "html" && html && (
 					<div className="flex items-center gap-1 rounded-[9px] bg-[#eef0f2] p-[3px]">

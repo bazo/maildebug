@@ -78,3 +78,8 @@ tasks:
                 sh: git rev-parse --short HEAD
         cmds:
             - docker buildx build --platform linux/amd64,linux/arm64 -t {{.REPO}}:latest -t {{.REPO}}:{{.BRANCH}}-{{.SHA}} --push .
+
+    doctor:
+        desc: "Run React Doctor over the ui workspace, verbose"
+        cmds:
+            - bun run doctor -- --verbose {{.CLI_ARGS}}

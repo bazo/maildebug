@@ -30,11 +30,6 @@ export default function App() {
 	const [live, setLive] = useState(false);
 	const search = useDebounced(query.trim(), 250);
 
-	// Reset to the first page whenever the search term changes.
-	useEffect(() => {
-		setPage(1);
-	}, [search]);
-
 	const { data, refetch } = useQuery<MessagesResponse>({
 		queryKey: ["messages", page, search],
 		queryFn: async (): Promise<MessagesResponse> => {
@@ -197,14 +192,23 @@ export default function App() {
 						<SearchIcon size={15} stroke="#9aa1ac" className="flex-none" />
 						<input
 							value={query}
-							onChange={(e) => setQuery(e.target.value)}
+							onChange={(e) => {
+								// Reset to page 1 together with the query so React batches
+								// both into one render (no search-change effect chain).
+								setQuery(e.target.value);
+								setPage(1);
+							}}
 							placeholder="Search sender or subject"
 							className="min-w-0 flex-1 border-none bg-transparent text-[13.5px] text-[#1a1d21] outline-none placeholder:text-[#9aa1ac]"
 						/>
 						{query && (
 							<button
 								type="button"
-								onClick={() => setQuery("")}
+								aria-label="Clear search"
+								onClick={() => {
+									setQuery("");
+									setPage(1);
+								}}
 								className="flex flex-none cursor-pointer p-0.5 text-[#9aa1ac] hover:text-[#1a1d21]"
 							>
 								<CloseIcon size={14} />
@@ -248,6 +252,7 @@ export default function App() {
 					<div className="flex items-center justify-between border-t border-[#eef0f2] px-5 py-2.5">
 						<button
 							type="button"
+							aria-label="Previous page"
 							disabled={page <= 1}
 							onClick={() => setPage((p) => Math.max(1, p - 1))}
 							className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#eaecef] bg-white text-[#6b7280] enabled:cursor-pointer enabled:hover:bg-[#f4f5f7] disabled:opacity-40"
@@ -259,6 +264,7 @@ export default function App() {
 						</span>
 						<button
 							type="button"
+							aria-label="Next page"
 							disabled={page >= pagesCount}
 							onClick={() => setPage((p) => Math.min(pagesCount, p + 1))}
 							className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#eaecef] bg-white text-[#6b7280] enabled:cursor-pointer enabled:hover:bg-[#f4f5f7] disabled:opacity-40"

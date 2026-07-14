@@ -1,0 +1,13 @@
+{
+	"$schema": "https://react.doctor/schema/config.json",
+	// Score each React app separately (workspace package names).
+	"projects": ["ui"],
+	"rules": {
+		// TanStack Form's render-prop API passes children as a prop by design
+		// (mirrors the oxlint.config.ts no-children-prop: off).
+		"react-doctor/no-children-prop": "off"
+	},
+	"ignore": {
+		"files": ["**/dist/**"]
+	}
+}

@@ -65,12 +65,14 @@ export default function EmailViewport({ html, text, width, title }: EmailViewpor
 	return (
 		<div className="flex justify-center overflow-x-auto bg-[#eef0f3] p-7">
 			<div
-				className="overflow-hidden rounded-[12px] bg-white"
+				className="overflow-hidden rounded-xl bg-white"
 				style={{
 					width: width == null ? "100%" : `${width}px`,
 					maxWidth: "100%",
 					flex: width == null ? "1 1 auto" : "0 0 auto",
-					transition: "width .25s ease",
+					// No width transition: switching viewport is a discrete change, and
+					// animating width relayouts every frame (the iframe reflows its
+					// height at the same time). Snapping is smoother than the jank.
 					boxShadow: "0 1px 3px rgba(16,24,40,.08), 0 8px 24px rgba(16,24,40,.06)",
 				}}
 			>
