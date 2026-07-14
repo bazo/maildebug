@@ -27,6 +27,8 @@ WORKDIR ${DEST}
 COPY --from=bun-builder /tmp/ui/dist ui/dist
 
 COPY api api
+COPY check check
+COPY events events
 COPY session session
 COPY storage storage
 COPY types types
