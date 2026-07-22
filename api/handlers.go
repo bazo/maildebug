@@ -50,10 +50,16 @@ func (api *Api) LoadMessagesHandler(w http.ResponseWriter, r *http.Request) {
 
 	pagesCount = int64(math.Ceil(x))
 
+	responseMessages := make([]*types.MailDataResponse, 0, len(messages))
+
+	for _, message := range messages {
+		responseMessages = append(responseMessages, types.NewMailDataResponse(message))
+	}
+
 	response := types.ApiResponse{
 		Page:       page,
 		PagesCount: pagesCount,
-		Messages:   messages,
+		Messages:   responseMessages,
 	}
 
 	createResponse(w, response, http.StatusOK)
@@ -106,7 +112,16 @@ func (api *Api) LoadMessagesAttachment(w http.ResponseWriter, r *http.Request) {
 	//
 	// FormatMediaType quotes/encodes the filename so names with spaces or
 	// special characters aren't mangled by browsers.
-	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": attachment.Name}))
+	//
+	// Inline parts (the images an HTML body pulls in via cid:) are served with
+	// an inline disposition so opening one directly renders it instead of
+	// downloading it.
+	disposition := "attachment"
+	if attachment.Inline {
+		disposition = "inline"
+	}
+
+	w.Header().Set("Content-Disposition", mime.FormatMediaType(disposition, map[string]string{"filename": attachment.Name}))
 	w.Header().Set("Content-Type", attachment.MediaType)
 	io.Copy(w, bytes.NewReader(attachment.Data))
 }

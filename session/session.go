@@ -166,11 +166,13 @@ func newPartData(data []byte, mediaType string, charset string) types.PartData {
 	}
 }
 
-func newAttachmentData(data []byte, mediaType string, attachmentName string) types.Attachment {
+func newAttachmentData(data []byte, mediaType string, meta partMeta) types.Attachment {
 	return types.Attachment{
 		Data:      data,
 		MediaType: mediaType,
-		Name:      attachmentName,
+		Name:      meta.name,
+		ContentID: meta.contentID,
+		Inline:    meta.inline,
 	}
 }
 
@@ -195,18 +197,25 @@ func parseParts(mimeData io.Reader, params map[string]string) ([]*types.PartData
 		}
 
 		mediaType, params, err := mime.ParseMediaType(newPart.Header.Get("Content-Type"))
+		if err != nil {
+			// RFC 2045: a part with a missing or unparseable Content-Type is
+			// text/plain. Normalizing here keeps the classification below from
+			// treating it as binary just because the header was malformed.
+			mediaType = "text/plain"
+			params = map[string]string{}
+		}
 
-		if err == nil && strings.HasPrefix(mediaType, "multipart/") {
+		if strings.HasPrefix(mediaType, "multipart/") {
 			p, a, err := parseParts(newPart, params)
 			if err == nil {
 				parts = append(parts, p...)
 				attachments = append(attachments, a...)
 			}
 		} else {
-			isAttachment, data, err := extractPartData(newPart, mediaType, params)
+			meta, data, err := extractPartData(newPart, mediaType, params)
 			if err == nil && data != nil {
-				if isAttachment {
-					attachment := newAttachmentData(data, mediaType, params["name"])
+				if meta.isAttachment {
+					attachment := newAttachmentData(data, mediaType, meta)
 					attachments = append(attachments, &attachment)
 				} else {
 					part := newPartData(data, mediaType, params["charset"])
@@ -234,18 +243,21 @@ func parseSinglePart(body io.Reader, header mail.Header, mediaType string, param
 	return &part, nil
 }
 
-func extractPartData(part *multipart.Part, mediaType string, params map[string]string) (bool, []byte, error) {
+// partMeta says how a decoded MIME part should be stored: as a renderable body
+// part, or as an attachment — either a download or an inline resource the HTML
+// body references by Content-ID.
+type partMeta struct {
+	isAttachment bool
+	inline       bool
+	contentID    string
+	name         string
+}
+
+func extractPartData(part *multipart.Part, mediaType string, params map[string]string) (partMeta, []byte, error) {
 	partBytes, err := io.ReadAll(part)
 
 	if err != nil {
-		return false, nil, err
-	}
-
-	contentDisposition := part.Header.Get("Content-Disposition")
-
-	isAttachment := false
-	if strings.Contains(contentDisposition, "attachment") {
-		isAttachment = true
+		return partMeta{}, nil, err
 	}
 
 	contentTransferEncoding := part.Header.Get("Content-Transfer-Encoding")
@@ -253,10 +265,36 @@ func extractPartData(part *multipart.Part, mediaType string, params map[string]s
 	data, err := decodePart(partBytes, contentTransferEncoding)
 
 	if err != nil {
-		return false, nil, err
+		return partMeta{}, nil, err
 	}
 
-	return isAttachment, data, nil
+	disposition, dispParams, err := mime.ParseMediaType(part.Header.Get("Content-Disposition"))
+	if err != nil {
+		disposition = ""
+		dispParams = map[string]string{}
+	}
+
+	meta := partMeta{
+		inline: disposition == "inline",
+		// RFC 2392 addresses parts as cid:<id>, without the angle brackets the
+		// header carries.
+		contentID: strings.Trim(part.Header.Get("Content-ID"), "<>"),
+		name:      dispParams["filename"],
+	}
+
+	if meta.name == "" {
+		meta.name = params["name"]
+	}
+
+	// Everything that isn't text becomes an attachment, not just parts marked
+	// as a download. PartData.Data is a string and storm persists MailData as
+	// JSON, so any invalid UTF-8 byte in a body part is rewritten to U+FFFD —
+	// that silently destroys inline images (Content-Disposition: inline plus a
+	// Content-ID) before the UI ever sees them. Attachment.Data is []byte and
+	// round-trips as base64.
+	meta.isAttachment = disposition == "attachment" || !strings.HasPrefix(mediaType, "text/")
+
+	return meta, data, nil
 }
 
 func decodePart(partData []byte, contentTransferEncoding string) ([]byte, error) {
