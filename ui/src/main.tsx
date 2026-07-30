@@ -4,6 +4,7 @@ import ReactDOM from "react-dom/client";
 
 import "./index.css";
 import App from "@/app";
+import { SettingsProvider } from "@/settings";
 
 const queryClient = new QueryClient({
 	defaultOptions: {
@@ -17,7 +18,9 @@ const queryClient = new QueryClient({
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
 	<React.StrictMode>
 		<QueryClientProvider client={queryClient}>
-			<App />
+			<SettingsProvider>
+				<App />
+			</SettingsProvider>
 		</QueryClientProvider>
 	</React.StrictMode>,
 );

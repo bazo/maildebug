@@ -11,6 +11,7 @@ import {
 	PaperclipIcon,
 	TabletIcon,
 } from "@/icons";
+import { useSettings } from "@/settings";
 import type { Message } from "@/types";
 
 interface MessagePreviewProps {
@@ -76,6 +77,7 @@ export default function MessagePreview({ message }: MessagePreviewProps) {
 	const [viewport, setViewport] = useState<number | null>(null);
 	const [customWidth, setCustomWidth] = useState("");
 	const [copied, setCopied] = useState<string>("");
+	const { resolvedLocale } = useSettings();
 
 	const category = deriveCategory(message);
 	const tag = categoryColors(category);
@@ -125,7 +127,7 @@ export default function MessagePreview({ message }: MessagePreviewProps) {
 								{category}
 							</span>
 							<span className="font-mono text-[12.5px] text-[#9aa1ac]">
-								{formatDate(message.date)}
+								{formatDate(message.date, resolvedLocale)}
 							</span>
 						</div>
 						<h1 className="m-0 text-[21px] font-bold leading-[1.25] tracking-[-0.02em]">
@@ -158,7 +160,7 @@ export default function MessagePreview({ message }: MessagePreviewProps) {
 					copied={copied === "to"}
 					onCopy={() => copy("to", message.to.join(", "))}
 				/>
-				<MetaField label="Date" value={formatDate(message.date)} />
+				<MetaField label="Date" value={formatDate(message.date, resolvedLocale)} />
 				<MetaField
 					label="Message-Id"
 					value={message.messageId}

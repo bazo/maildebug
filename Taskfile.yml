@@ -35,6 +35,13 @@ tasks:
         cmds:
             - ./maildebug
 
+    install:
+        desc: Build the UI and install the self-contained maildebug binary onto your PATH (go install → $GOBIN or ~/go/bin)
+        deps: [client:build]
+        cmds:
+            - go install .
+            - 'BIN=$(go env GOBIN); test -n "$BIN" || BIN=$(go env GOPATH)/bin; echo "Installed maildebug to $BIN — ensure that dir is on your PATH, then run maildebug"'
+
     test:
         dir: email-test
         cmds:

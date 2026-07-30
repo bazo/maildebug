@@ -18,15 +18,20 @@ import {
 	MailIcon,
 	RefreshIcon,
 	SearchIcon,
+	SettingsIcon,
 	TrashIcon,
 } from "@/icons";
 import MessagePreview from "@/message-preview";
+import { useSettings } from "@/settings";
+import SettingsDialog from "@/settings-dialog";
 import type { Message, MessagesResponse } from "@/types";
 
 export default function App() {
 	const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
 	const [page, setPage] = useState(1);
 	const [query, setQuery] = useState("");
+	const [settingsOpen, setSettingsOpen] = useState(false);
+	const { resolvedLocale } = useSettings();
 
 	const { data, refetch } = useQuery<MessagesResponse>({
 		queryKey: ["messages", page],
@@ -109,6 +114,17 @@ export default function App() {
 						</button>
 						<button
 							type="button"
+							title="Settings"
+							onClick={() => setSettingsOpen(true)}
+							className={classNames(
+								iconBtn,
+								"hover:bg-[#f4f5f7] hover:text-[#1a1d21]",
+							)}
+						>
+							<SettingsIcon size={15} />
+						</button>
+						<button
+							type="button"
 							title="Clear all"
 							onClick={handleDeleteAll}
 							className={classNames(
@@ -157,6 +173,7 @@ export default function App() {
 						<MessageRow
 							key={message.id}
 							message={message}
+							locale={resolvedLocale}
 							selected={selectedMessage?.id === message.id}
 							onSelect={() => setSelectedMessage(message)}
 						/>
@@ -202,17 +219,20 @@ export default function App() {
 					<EmptyReader cleared={messages.length === 0 && !query} />
 				)}
 			</main>
+
+			{settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
 		</div>
 	);
 }
 
 interface MessageRowProps {
 	message: Message;
+	locale: string;
 	selected: boolean;
 	onSelect: () => void;
 }
 
-function MessageRow({ message, selected, onSelect }: MessageRowProps) {
+function MessageRow({ message, locale, selected, onSelect }: MessageRowProps) {
 	const category = deriveCategory(message);
 	const tag = categoryColors(category);
 	const preview = snippet(message);
@@ -243,7 +263,7 @@ function MessageRow({ message, selected, onSelect }: MessageRowProps) {
 							{displayName(message)}
 						</span>
 						<span className="flex-none text-[11px] font-medium text-[#9aa1ac]">
-							{formatTime(message.date)}
+							{formatTime(message.date, locale)}
 						</span>
 					</div>
 					<div className="mt-[3px] flex items-center gap-[7px]">
