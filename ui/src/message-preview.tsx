@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import ChecksPanel from "@/checks-panel";
 import EmailViewport from "@/email-viewport";
@@ -13,6 +13,7 @@ import {
 	TabletIcon,
 	TrashIcon,
 } from "@/icons";
+import { useSettings } from "@/settings";
 import type { Message } from "@/types";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -30,9 +31,42 @@ const VIEWPORTS = [
 	{ label: "Mobile", icon: MobileIcon, width: 375 },
 ] as const;
 
+function attachmentUrl(messageId: string, index: number): string {
+	return `${API}/messages/${messageId}/attachments/${index}`;
+}
+
 export default function MessagePreview({ message, onDelete }: MessagePreviewProps) {
-	const html = message.parts.find((p) => p.mediaType === "text/html");
-	const plainText = message.parts.find((p) => p.mediaType === "text/plain");
+	// Both are null rather than [] when the message failed to parse and only
+	// its raw bytes were kept. attachments is memoized so the fallback doesn't
+	// hand out a fresh array each render — its identity reaches the sanitizer
+	// through cidUrls.
+	const parts = message.parts ?? [];
+	const attachments = useMemo(() => message.attachments ?? [], [message.attachments]);
+
+	const html = parts.find((p) => p.mediaType === "text/html");
+	const plainText = parts.find((p) => p.mediaType === "text/plain");
+
+	// Inline parts are addressed from the HTML as cid:<Content-ID>. Absolutize
+	// the URLs: they end up inside the preview iframe's srcdoc document, which
+	// has no URL of its own.
+	const cidUrls = useMemo(() => {
+		const map: Record<string, string> = {};
+		attachments.forEach((attachment, index) => {
+			if (attachment.contentId) {
+				map[attachment.contentId] = new URL(
+					attachmentUrl(message.id, index),
+					window.location.href,
+				).href;
+			}
+		});
+		return map;
+	}, [message.id, attachments]);
+
+	// Inline images are already rendered inside the body; listing them as
+	// downloads too is noise. Keep the original index — it addresses the API.
+	const downloads = attachments
+		.map((attachment, index) => ({ attachment, index }))
+		.filter(({ attachment }) => !attachment.inline);
 
 	const [tab, setTab] = useState<TabKey>(html ? "html" : "text");
 	// Email preview width in px, or null for full-width responsive (Desktop).
@@ -41,6 +75,7 @@ export default function MessagePreview({ message, onDelete }: MessagePreviewProp
 	const [copied, setCopied] = useState<string>("");
 	// True on-disk RFC 822 source, fetched lazily when the Raw tab is opened.
 	const [raw, setRaw] = useState<string | null>(null);
+	const { resolvedLocale } = useSettings();
 
 	const category = deriveCategory(message);
 	const tag = categoryColors(category);
@@ -100,7 +135,7 @@ export default function MessagePreview({ message, onDelete }: MessagePreviewProp
 								{category}
 							</span>
 							<span className="font-mono text-[12.5px] text-[#9aa1ac]">
-								{formatDate(message.date)}
+								{formatDate(message.date, resolvedLocale)}
 							</span>
 						</div>
 						<h1 className="m-0 text-[21px] font-bold leading-[1.25] tracking-[-0.02em]">
@@ -145,7 +180,7 @@ export default function MessagePreview({ message, onDelete }: MessagePreviewProp
 					copied={copied === "to"}
 					onCopy={() => copy("to", message.to.join(", "))}
 				/>
-				<MetaField label="Date" value={formatDate(message.date)} />
+				<MetaField label="Date" value={formatDate(message.date, resolvedLocale)} />
 				<MetaField
 					label="Message-Id"
 					value={message.messageId}
@@ -156,15 +191,15 @@ export default function MessagePreview({ message, onDelete }: MessagePreviewProp
 			</div>
 
 			{/* attachments */}
-			{message.attachments.length > 0 && (
+			{downloads.length > 0 && (
 				<div className="flex flex-none flex-wrap items-center gap-2 border-b border-[#eaecef] bg-white px-8 py-3">
 					<span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#9aa1ac]">
 						Attachments
 					</span>
-					{message.attachments.map((attachment, index) => (
+					{downloads.map(({ attachment, index }) => (
 						<a
-							key={`${attachment.name}:${attachment.mediaType}`}
-							href={`${import.meta.env.VITE_API_URL || ""}/messages/${message.id}/attachments/${index}`}
+							key={`att-${index}`}
+							href={attachmentUrl(message.id, index)}
 							className="flex items-center gap-1.5 rounded-lg border border-[#eaecef] bg-[#fbfbfc] px-2.5 py-1.5 text-[12.5px] font-medium text-[#374151] hover:bg-[#f4f5f7]"
 							title={attachment.mediaType}
 						>
@@ -251,7 +286,12 @@ export default function MessagePreview({ message, onDelete }: MessagePreviewProp
 			<div className="min-h-0 flex-1 overflow-auto bg-[#eef0f3]">
 				{tab === "html" &&
 					(html ? (
-						<EmailViewport html={html.data} width={viewport} title={message.subject} />
+						<EmailViewport
+							html={html.data}
+							width={viewport}
+							title={message.subject}
+							cidUrls={cidUrls}
+						/>
 					) : (
 						<EmptyPane text="No HTML part in this message." />
 					))}

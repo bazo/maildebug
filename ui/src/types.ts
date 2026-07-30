@@ -28,6 +28,10 @@ export interface Part {
 export interface Attachment {
 	mediaType: string;
 	name: string;
+	/** Content-ID without angle brackets; set for parts the HTML references as cid:<id>. */
+	contentId?: string;
+	/** Content-Disposition: inline — rendered by the message, not a download. */
+	inline?: boolean;
 }
 
 export type CheckStatus = "pass" | "warn" | "fail";

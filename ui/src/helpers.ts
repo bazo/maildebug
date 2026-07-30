@@ -1,20 +1,42 @@
+import { DEFAULT_LOCALE } from "@/settings";
 import type { Message } from "@/types";
 
 export function classNames(...classes: any[]) {
 	return classes.filter(Boolean).join(" ");
 }
 
-export function formatDate(dateString: string): string {
+/** Full "date + time"; `locale` comes from the settings screen. */
+export function formatDate(dateString: string, locale: string = DEFAULT_LOCALE): string {
 	const date = new Date(dateString);
-	const locale = import.meta.env.VITE_LOCALE || "sk-SK";
 	return `${date.toLocaleDateString(locale)} ${date.toLocaleTimeString(locale)}`;
 }
 
-/** Short "HH:MM" used in the message list rows. */
-export function formatTime(dateString: string): string {
+/**
+ * Timestamp for the message list rows: "HH:MM" for today, a day/month date
+ * within the current year, and a full date for anything older.
+ */
+export function formatTime(dateString: string, locale: string = DEFAULT_LOCALE): string {
 	const date = new Date(dateString);
-	const locale = import.meta.env.VITE_LOCALE || "sk-SK";
-	return date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+	const now = new Date();
+
+	const sameDay =
+		date.getDate() === now.getDate() &&
+		date.getMonth() === now.getMonth() &&
+		date.getFullYear() === now.getFullYear();
+
+	if (sameDay) {
+		return date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+	}
+
+	if (date.getFullYear() === now.getFullYear()) {
+		return date.toLocaleDateString(locale, { day: "numeric", month: "short" });
+	}
+
+	return date.toLocaleDateString(locale, {
+		day: "numeric",
+		month: "short",
+		year: "numeric",
+	});
 }
 
 /** Case-insensitive lookup over the parsed (canonicalized) raw headers. */

@@ -7,13 +7,20 @@ interface EmailViewportProps {
 	/** Iframe width in px, or null for full-width responsive (Desktop). */
 	width: number | null;
 	title?: string;
+	/** Content-ID → URL, for inline parts the body references as cid:<id>. */
+	cidUrls?: Record<string, string>;
 }
+
+// rewriteExternalResources below bypasses lettersanitizer's own scheme check,
+// so the allowlist has to be reapplied by hand. Same set the library defaults
+// to for resources, plus data: for self-contained images.
+const ALLOWED_RESOURCE_SCHEMES = ["http", "https", "data"];
 
 // Minimal reset injected into the iframe document. Kept tiny so it never
 // interferes with the email's own cascade or @media breakpoints.
 const RESET = `html,body{margin:0;padding:0;}img{max-width:100%;}body{background:#fff;}`;
 
-export default function EmailViewport({ html, text, width, title }: EmailViewportProps) {
+export default function EmailViewport({ html, text, width, title, cidUrls }: EmailViewportProps) {
 	const iframeRef = useRef<HTMLIFrameElement>(null);
 	const [height, setHeight] = useState(400);
 
@@ -23,11 +30,23 @@ export default function EmailViewport({ html, text, width, title }: EmailViewpor
 		const body = sanitize(html, text, {
 			preserveCssPriority: true,
 			noWrapper: true,
+			// Emails embed images as separate MIME parts referenced by
+			// src="cid:<Content-ID>". No browser resolves that scheme, and
+			// lettersanitizer drops any src whose scheme it doesn't allow — so
+			// without this the images silently lose their src entirely. Point
+			// each cid at the API route that serves the stored part.
+			rewriteExternalResources: (url) => {
+				const scheme = url.toLowerCase().split(":")[0];
+				if (scheme === "cid") {
+					return cidUrls?.[decodeURIComponent(url.slice(4))] ?? "";
+				}
+				return ALLOWED_RESOURCE_SCHEMES.includes(scheme) ? url : "";
+			},
 		});
 		// <base target="_blank"> makes every link open in a new tab; the
 		// sandbox below grants allow-popups so the navigation isn't blocked.
 		return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base target="_blank"><style>${RESET}</style></head><body>${body}</body></html>`;
-	}, [html, text]);
+	}, [html, text, cidUrls]);
 
 	// Auto-size the iframe to its content and keep it in sync as the email
 	// reflows (e.g. when the chosen width crosses a media-query breakpoint).

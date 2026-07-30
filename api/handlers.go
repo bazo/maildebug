@@ -94,11 +94,17 @@ func (api *Api) LoadMessagesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	responseMessages := make([]*types.MailDataResponse, 0, len(messages))
+
+	for _, message := range messages {
+		responseMessages = append(responseMessages, types.NewMailDataResponse(message))
+	}
+
 	response := types.ApiResponse{
 		Page:       page,
 		PagesCount: pagesCount,
 		Unread:     unread,
-		Messages:   messages,
+		Messages:   responseMessages,
 	}
 
 	createResponse(w, response, http.StatusOK)
@@ -172,14 +178,23 @@ func (api *Api) LoadMessagesAttachment(w http.ResponseWriter, r *http.Request) {
 	//
 	// FormatMediaType quotes/encodes the filename so names with spaces or
 	// special characters aren't mangled by browsers.
-	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": attachment.Name}))
+	//
+	// Inline parts (the images an HTML body pulls in via cid:) are served with
+	// an inline disposition so opening one directly renders it instead of
+	// downloading it.
+	disposition := "attachment"
+	if attachment.Inline {
+		disposition = "inline"
+	}
+
+	w.Header().Set("Content-Disposition", mime.FormatMediaType(disposition, map[string]string{"filename": attachment.Name}))
 	w.Header().Set("Content-Type", attachment.MediaType)
 	io.Copy(w, bytes.NewReader(attachment.Data))
 }
 
 // LoadMessageHandler returns a single message with full parts/headers. Like
-// LoadMessages it strips the heavy decoded attachment bytes (fetched separately
-// via the attachment endpoint).
+// LoadMessages it serves a MailDataResponse, which omits the heavy decoded
+// attachment bytes (fetched separately via the attachment endpoint).
 func (api *Api) LoadMessageHandler(w http.ResponseWriter, r *http.Request) {
 	id, ok := bunrouter.ParamsFromContext(r.Context()).Get("id")
 	if !ok {
@@ -197,11 +212,7 @@ func (api *Api) LoadMessageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, att := range message.Attachments {
-		att.Data = nil
-	}
-
-	createResponse(w, message, http.StatusOK)
+	createResponse(w, types.NewMailDataResponse(message), http.StatusOK)
 }
 
 // DeleteMessageHandler deletes one message by id.
