@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -32,13 +32,16 @@ export default function App() {
 	const [query, setQuery] = useState("");
 	const [live, setLive] = useState(false);
 	const search = useDebounced(query.trim(), 250);
+	// The paginator reacts to `page` immediately; only the fetch waits, so
+	// clicking through several pages quickly costs one request, not one each.
+	const fetchPage = useDebounced(page, 200);
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const { resolvedLocale } = useSettings();
 
 	const { data, refetch } = useQuery<MessagesResponse>({
-		queryKey: ["messages", page, search],
+		queryKey: ["messages", fetchPage, search],
 		queryFn: async (): Promise<MessagesResponse> => {
-			const params = new URLSearchParams({ page: String(page) });
+			const params = new URLSearchParams({ page: String(fetchPage) });
 			if (search) params.set("search", search);
 			return (
 				await fetch(`${import.meta.env.VITE_API_URL || ""}/messages?${params}`, {
@@ -46,6 +49,11 @@ export default function App() {
 				})
 			).json();
 		},
+		// Page (and search) changes swap the query key, which would otherwise
+		// leave `data` undefined until the new page arrives — the list empties
+		// and `pagesCount` falls back to 1, so the paginator unmounts and pops
+		// back. Keep showing the previous page until the next one lands.
+		placeholderData: keepPreviousData,
 	});
 
 	const messages = useMemo(() => data?.messages ?? [], [data]);

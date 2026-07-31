@@ -1,5 +1,5 @@
 import { sanitize } from "lettersanitizer";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
 interface EmailViewportProps {
 	html: string;
@@ -9,6 +9,12 @@ interface EmailViewportProps {
 	title?: string;
 	/** Content-ID → URL, for inline parts the body references as cid:<id>. */
 	cidUrls?: Record<string, string>;
+	/**
+	 * Receives the live iframe, so callers can rasterize what's rendered
+	 * (see `screenshot.ts`). Kept as a plain prop rather than a forwarded ref
+	 * because the component needs the same node for its own auto-sizing.
+	 */
+	frameRef?: RefObject<HTMLIFrameElement | null>;
 }
 
 // rewriteExternalResources below bypasses lettersanitizer's own scheme check,
@@ -20,7 +26,14 @@ const ALLOWED_RESOURCE_SCHEMES = ["http", "https", "data"];
 // interferes with the email's own cascade or @media breakpoints.
 const RESET = `html,body{margin:0;padding:0;}img{max-width:100%;}body{background:#fff;}`;
 
-export default function EmailViewport({ html, text, width, title, cidUrls }: EmailViewportProps) {
+export default function EmailViewport({
+	html,
+	text,
+	width,
+	title,
+	cidUrls,
+	frameRef,
+}: EmailViewportProps) {
 	const iframeRef = useRef<HTMLIFrameElement>(null);
 	const [height, setHeight] = useState(400);
 
@@ -96,7 +109,10 @@ export default function EmailViewport({ html, text, width, title, cidUrls }: Ema
 				}}
 			>
 				<iframe
-					ref={iframeRef}
+					ref={(node) => {
+						iframeRef.current = node;
+						if (frameRef) frameRef.current = node;
+					}}
 					title={title || "Email preview"}
 					srcDoc={srcDoc}
 					// No allow-scripts: untrusted email must never execute JS.

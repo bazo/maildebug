@@ -113,6 +113,37 @@ export const SettingsIcon = (p: IconProps) => (
 	</Icon>
 );
 
+export const CameraIcon = (p: IconProps) => (
+	<Icon {...p}>
+		<path d="M3 8a2 2 0 0 1 2-2h2l1.5-2h7L17 6h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+		<circle cx="12" cy="13" r="3.5" />
+	</Icon>
+);
+
+export const ExpandIcon = (p: IconProps) => (
+	<Icon strokeWidth={2.1} {...p}>
+		<path d="M15 3h6v6" />
+		<path d="M9 21H3v-6" />
+		<path d="M21 3l-7 7" />
+		<path d="M3 21l7-7" />
+	</Icon>
+);
+
+export const CollapseIcon = (p: IconProps) => (
+	<Icon strokeWidth={2.1} {...p}>
+		<path d="M20 10h-6V4" />
+		<path d="M4 14h6v6" />
+		<path d="M21 3l-7 7" />
+		<path d="M3 21l7-7" />
+	</Icon>
+);
+
+export const SpinnerIcon = (p: IconProps) => (
+	<Icon strokeWidth={2.2} {...p}>
+		<path d="M12 3a9 9 0 1 0 9 9" />
+	</Icon>
+);
+
 export const ChevronLeftIcon = (p: IconProps) => (
 	<Icon {...p}>
 		<path d="m15 18-6-6 6-6" />

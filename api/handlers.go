@@ -189,6 +189,10 @@ func (api *Api) LoadMessagesAttachment(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Disposition", mime.FormatMediaType(disposition, map[string]string{"filename": attachment.Name}))
 	w.Header().Set("Content-Type", attachment.MediaType)
+	// Same permissive CORS as every other response: the UI has to *read* these
+	// bytes (not just display them) when it rasterizes a preview to PNG, and in
+	// development it does that from the Vite origin, not the API's.
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	io.Copy(w, bytes.NewReader(attachment.Data))
 }
 
