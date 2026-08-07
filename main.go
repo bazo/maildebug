@@ -99,8 +99,9 @@ func loadConfig() {
 		Domain:            envOrDefault("DOMAIN", "localhost"),
 		ReadTimeout:       envInt("READ_TIMEOUT", 10),
 		WriteTimeout:      envInt("WRITE_TIMEOUT", 10),
-		MaxMessageBytes:   envInt64("MAX_MESSAGE_BYTES", 1048576),
+		MaxMessageBytes:   envInt64("MAX_MESSAGE_BYTES", 26214400),
 		MaxRecipients:     envInt("MAX_RECIPIENTS", 50),
+		MaxLineLength:     envInt("MAX_LINE_LENGTH", 1048576),
 		AllowInsecureAuth: envBool("ALLOW_INSECURE_AUTH", true),
 		SpamAssassin:      envOrDefault("SPAMASSASSIN", ""),
 	}
@@ -146,6 +147,7 @@ func main() {
 	s.WriteTimeout = time.Duration(config.WriteTimeout) * time.Second
 	s.MaxMessageBytes = config.MaxMessageBytes
 	s.MaxRecipients = config.MaxRecipients
+	s.MaxLineLength = config.MaxLineLength
 	s.AllowInsecureAuth = config.AllowInsecureAuth
 
 	router := bunrouter.New(

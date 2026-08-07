@@ -215,6 +215,27 @@ describe("live UX + core endpoints", () => {
 		});
 	}
 
+	// Sorting used to compare the Date header's RFC 3339 *text*, so a UTC-stamped
+	// message (what nodemailer sends) interleaved with a locally-stamped one by
+	// exactly the UTC offset. Listings go by capture order instead.
+	test("lists newest-captured first regardless of the Date header's zone", async () => {
+		// Sent oldest → newest; the headers disagree about zone and clock face.
+		await sendPlain("z@x.com", "zone-1", "one", `Date: Tue, 04 Aug 2026 13:00:00 +0200\r\n`);
+		await sendPlain("z@x.com", "zone-2", "two", `Date: Tue, 04 Aug 2026 11:30:00 +0000\r\n`);
+		await sendPlain("z@x.com", "zone-3", "three", `Date: Tue, 04 Aug 2026 08:15:00 -0400\r\n`);
+		await waitForMessage("zone-3");
+
+		const listed = (await listMessages())
+			.map((m) => m.subject)
+			.filter((s) => s.startsWith("zone-"));
+		expect(listed).toEqual(["zone-3", "zone-2", "zone-1"]);
+
+		const searched = await fetch(`${API_BASE}/messages?search=zone-`)
+			.then((r) => r.json() as Promise<{ messages: ApiMessage[] }>)
+			.then((b) => b.messages.map((m) => m.subject));
+		expect(searched).toEqual(["zone-3", "zone-2", "zone-1"]);
+	}, 20000);
+
 	test("server-side search filters across all fields", async () => {
 		await sendPlain("bob@x.com", "Your receipt", "thanks for your order");
 		await sendPlain("carol@y.com", "Weekly newsletter", "big sale inside");
@@ -284,6 +305,39 @@ describe("live UX + core endpoints", () => {
 		const res = await fetch(`${API_BASE}/messages/${msg.id}/spam-check`);
 		expect(res.status).toBe(409);
 	}, 20000);
+
+	// go-smtp caps input lines at 2000 chars by default and kills the connection
+	// over it; renderers like React Email emit the whole body on one line.
+	test("accepts an unwrapped HTML body on a single very long line", async () => {
+		const filler = "<span>x</span>".repeat(4000); // ~56k chars, no line breaks
+		const html = `<html><body>${filler}<p>END-MARKER</p></body></html>`;
+		expect(html.length).toBeGreaterThan(50000);
+
+		await sendPlain("long@x.com", "long-line-data", html, `Content-Type: text/html\r\n`);
+		const msg = await waitForMessage("long-line-data");
+
+		const part = msg.parts.find((p) => p.mediaType === "text/html");
+		expect(part).toBeDefined();
+		expect(part!.data).toContain("END-MARKER");
+	}, 30000);
+
+	test("nodemailer delivers a long-line body (CHUNKING/BDAT path)", async () => {
+		const subject = "long-line-nodemailer";
+		const html = `<html><body>${"<span>y</span>".repeat(4000)}<p>END-MARKER</p></body></html>`;
+
+		await sendEmail({
+			config: smtpConfig,
+			from: "sender@example.com",
+			to: "long@example.com",
+			subject,
+			html,
+		});
+
+		const msg = await waitForMessage(subject);
+		const part = msg.parts.find((p) => p.mediaType === "text/html");
+		expect(part).toBeDefined();
+		expect(part!.data).toContain("END-MARKER");
+	}, 30000);
 
 	test("SSE stream pushes a new-message event", async () => {
 		const controller = new AbortController();

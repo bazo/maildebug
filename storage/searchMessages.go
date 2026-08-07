@@ -63,7 +63,7 @@ func containsFold(haystack, needle string) bool {
 func (s *Storage) SearchMessages(f types.SearchFilter) ([]*types.MailData, error) {
 	messages := make([]*types.MailData, 0)
 
-	query := s.db.Select().Reverse().OrderBy("Date")
+	query := s.db.Select().Reverse().OrderBy(orderField)
 	err := query.Each(new(types.MailData), func(record interface{}) error {
 		message := record.(*types.MailData)
 		if !Matches(message, f) {

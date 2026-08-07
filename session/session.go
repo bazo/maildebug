@@ -83,7 +83,7 @@ func (s *session) Data(r io.Reader) error {
 	m, parseErr := mail.ReadMessage(bytes.NewReader(raw))
 	if parseErr != nil {
 		log.Printf("mail.ReadMessage failed (saving raw bytes anyway): %v", parseErr)
-		s.data.Date = time.Now()
+		s.data.Date = time.Now().UTC()
 		return s.onData(s.data, raw)
 	}
 
@@ -108,7 +108,10 @@ func (s *session) Data(r io.Reader) error {
 		log.Printf("parse Date header: %v", err)
 		date = time.Now()
 	}
-	s.data.Date = date
+	// Stored in UTC so every record's serialized timestamp is one comparable
+	// shape; the instant is unchanged and the UI renders it in the viewer's
+	// locale either way.
+	s.data.Date = date.UTC()
 
 	s.data.MessageId = m.Header.Get("Message-Id")
 	s.data.RawHeaders = m.Header

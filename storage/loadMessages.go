@@ -35,9 +35,7 @@ func (s *Storage) LoadMessages(page int64, limit int64) ([]*types.MailData, int6
 
 	skip := (page - 1) * limit
 
-	//err = s.db.AllByIndex("Date", &messages, storm.Limit(int(limit)), storm.Skip(int(skip)), storm.Reverse())
-
-	query := s.db.Select().Limit(int(limit)).Skip(int(skip)).Reverse().OrderBy("Date")
+	query := s.db.Select().Limit(int(limit)).Skip(int(skip)).Reverse().OrderBy(orderField)
 
 	err = query.Each(new(types.MailData), func(record interface{}) error {
 		message := record.(*types.MailData)

@@ -13,11 +13,15 @@ type Config struct {
 	APIPort string
 	DbName  string
 
-	Domain            string
-	ReadTimeout       int
-	WriteTimeout      int
-	MaxMessageBytes   int64
-	MaxRecipients     int
+	Domain          string
+	ReadTimeout     int
+	WriteTimeout    int
+	MaxMessageBytes int64
+	MaxRecipients   int
+	// MaxLineLength caps a single SMTP input line. go-smtp defaults to 2000,
+	// which rejects HTML mail emitted unwrapped (React Email et al.); 0 means
+	// unlimited.
+	MaxLineLength     int
 	AllowInsecureAuth bool
 
 	// SpamAssassin is the host:port of a spamd daemon (e.g. "localhost:783").

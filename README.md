@@ -95,9 +95,18 @@ All vars are prefixed `MAILDEBUG_`. Defaults live in `maildebug.env.example`.
 | `DOMAIN`                | `localhost` | SMTP greeting domain              |
 | `READ_TIMEOUT`          | `10`        | seconds                           |
 | `WRITE_TIMEOUT`         | `10`        | seconds                           |
-| `MAX_MESSAGE_BYTES`     | `1048576`   | hard cap per message              |
+| `MAX_MESSAGE_BYTES`     | `26214400`  | hard cap per message (25 MiB)     |
 | `MAX_RECIPIENTS`        | `50`        | per envelope                      |
+| `MAX_LINE_LENGTH`       | `1048576`   | max SMTP input line, `0` = off    |
 | `ALLOW_INSECURE_AUTH`   | `true`      | required for plaintext local auth |
+
+`MAX_LINE_LENGTH` overrides go-smtp's 2000-char default, which real senders trip
+constantly: React Email (and most HTML renderers) emit the body unwrapped, so a
+single line runs to tens of thousands of characters. Over that limit the server
+answers `500 5.4.0 Too long line, closing connection` (or `554 … too long a line
+in input stream` mid-`DATA`) and drops the connection — which many clients,
+nodemailer included, surface as a hang until their own socket timeout instead of
+an error.
 
 ## Running locally
 
